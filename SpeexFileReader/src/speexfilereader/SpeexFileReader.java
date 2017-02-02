@@ -36,7 +36,7 @@ public class SpeexFileReader {
     //reading input Speex stream
     public String readFile(File inputFile)
     {   
-        FileInputStream fileInputStream = null;
+        FileInputStream fileInputStream;
         byteFile = new byte[(int) inputFile.length()];
         
         try
@@ -113,7 +113,7 @@ public class SpeexFileReader {
         int i = 0;
         int j = 0;
         int initIndexVQ = 0;
-        int firstSubframe = 0;
+        //int firstSubframe = 0;
         int numOfLSB = 0;
         int n = 1; //number of frame
         // initialize inserting message...
@@ -122,29 +122,29 @@ public class SpeexFileReader {
                 System.out.println("Speex mode: 4");
                 T = 224;    //used to change index of next frame 
                 initIndexVQ = 75; // start or end index? 
-                firstSubframe = 75;
+                //firstSubframe = 75;
                 sfT=48; // start of next InnovationVQ subframe is at initIndexVQ += n*sfT; gdzie n <1,3>                
                 break;
             case 5:
                 System.out.println("Speex mode: 5");
                 T = 304;
                 initIndexVQ = 104;
-                firstSubframe = 104;
+                //firstSubframe = 104;
                 sfT=65; // 
                 break;
             case 6:
                 System.out.println("Speex mode: 6");
                 T = 368;
                 initIndexVQ = 120;
-                firstSubframe = 120;
+                //firstSubframe = 120;
                 sfT=81; //
                 break;
             default: 
-                System.out.println("Invalid Speex mode!!");
+                System.out.println("Unsupported Speex mode!!");
                 break;
         }
         
-        System.out.println(T + "\n" + initIndexVQ + "\n" + firstSubframe + "\n" + sfT);
+        System.out.println(T + "\n" + initIndexVQ + "\n" + sfT);
         
          StringBuilder originalStr = new StringBuilder(str);
         StringBuilder msgToHide = new StringBuilder(msg);
@@ -185,11 +185,12 @@ public class SpeexFileReader {
         while(!endOfFile)
         {
             arrayOfFrames = divideIntoFrames(str, mode);
+           
+            String tmpMsg;
             
-            endOfFile = true;
-            
-            /*String tmpMsg;
-            if (j + numOfLSB >= msgToHide.length()){                                
+            while(!endOfFrame)//when n <= 4
+            {
+                if (j + numOfLSB >= msgToHide.length()){                                
                     tmpMsg = msgToHide.substring(j, msgToHide.length());
                     System.out.println("last message " + tmpMsg);
             }
@@ -198,12 +199,14 @@ public class SpeexFileReader {
                 System.out.println("extracted from m2h " + tmpMsg);
                 j +=  numOfLSB;                                       // to troche nie tak, nie mogę umieścić całej wiadomości w jednej ramce
             }
-            while(!endOfFrame)
-            {
-                
-                
+                System.out.println(n + " " + tmpMsg);
+                n+=1;
+                if(n>4){
+                    endOfFrame = true;
+                    n=1;
+                }
             }
-            endOfFile = true;*/
+            endOfFile = true;
         }  
         return "";
     }
