@@ -106,7 +106,7 @@ public class SpeexFileReader {
     */
     private String insertMessage(String str, String msg, int m){
         String[] arrayOfFrames;
-        boolean endOfFile=false;
+        boolean endOfMsg=false;
         boolean endOfFrame=false;
         int T = 0;
         int sfT = 0;
@@ -182,8 +182,7 @@ public class SpeexFileReader {
             
         }
         
-        while(!endOfFile)
-        {
+        while(j < str.length() || !endOfMsg){
             arrayOfFrames = divideIntoFrames(str, mode);
            
             String tmpMsg;
@@ -206,7 +205,7 @@ public class SpeexFileReader {
                     n=1;
                 }
             }
-            endOfFile = true;
+            endOfMsg = true;
         }  
         return "";
     }
