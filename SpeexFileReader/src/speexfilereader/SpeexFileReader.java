@@ -8,6 +8,7 @@ package speexfilereader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.BufferedWriter;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.InputMismatchException;
@@ -27,26 +28,27 @@ class CustomException extends Exception {
 public class SpeexFileReader {
     
     //global variables
+    byte[] inputByteFile;    // file to read from
+    byte[] outputByteFile;
     String[] binaryStr; // string with data to hide 
-    byte[] byteFile;    // file to read from
     StringBuilder binFile = new StringBuilder();   //array of strings to write to
-    
-    int mode;   //
+    int mode;
     
     //reading input Speex stream
     public String readFile(File inputFile)
     {   
         FileInputStream fileInputStream;
-        byteFile = new byte[(int) inputFile.length()];
-        
+        inputByteFile = new byte[(int) inputFile.length()];
+        System.out.println("Length of input file" + inputFile.length());
         try
         { 
             fileInputStream = new FileInputStream(inputFile);
-            fileInputStream.read(byteFile);
+            fileInputStream.read(inputByteFile);
+           
             fileInputStream.close();
-            
-            for (byte b: byteFile){
+            for (byte b: inputByteFile){
                 int val = b;
+                //System.out.println("b value " + b);
                 for (int i = 0; i < 8; i++)
                 {
                     binFile.append((val & 128) == 0 ? 0 : 1);
@@ -56,7 +58,7 @@ public class SpeexFileReader {
             }
             
             //System.out.println(binFile);
-            System.out.println("Number of bits read from input file: " + 8 * byteFile.length);
+            System.out.println("Number of bits read from input file: " + 8 * inputByteFile.length);
         }
         catch (Exception e){
             e.printStackTrace();
@@ -66,32 +68,46 @@ public class SpeexFileReader {
         return finalBinFile;
     }
     //write modified stream into file and convert to original format 
-    /*private byte[] writeFile(String str){
-    
-      try{   
-        File outputFile = new File("C:/Users/Cz4p3L/Desktop/test.bin"); //where to write file;;
-          
-        if(!outputFile.exists()){
-            outputFile.createNewFile();
+    private void writeFile(String str){
+        
+        String outputPath = "C:\\Users\\Cz4p3L\\Desktop\\";
+        String extension = ".bin";
+        Scanner sc = new Scanner(System.in);
+        System.out.println("Please insert fileName");
+        String outputFileName = sc.nextLine();
+        String fileDest = outputPath + outputFileName + extension;
+        boolean endOfStr = false;
+        int i=0;
+        int j=0;
+        int tmpByte=0;
+        outputByteFile = new byte[str.length()/8];
+        while(!endOfStr){
+            tmpByte = Integer.parseInt(str.substring(j, j+8), 2);
+            System.out.println("tmpbyte " + tmpByte);
+            outputByteFile[i] = (byte)tmpByte;
+            System.out.println("byte b:" + outputByteFile[i]);
+            i+=1;
+            j+=8;
+            if (j >= str.length()){
+                endOfStr = true;
+            }
+            
         }
         
-        FileWriter fw = new FileWriter(outputFile.getAbsoluteFile());
-        BufferedWriter bw = new BufferedWriter(fw);
-	for(String a: binFile){
-            fw.write(a);            
+        try (FileOutputStream fileOuputStream = new FileOutputStream(fileDest)){
+            fileOuputStream.write(outputByteFile);
+            System.out.println("Writing file - done!");
         }
-	bw.close();
-        System.out.println("Writing to file: DONE");
-      }
-      catch (IOException e){
-        e.printStackTrace();
-      }
-      return byteFile;
-    }*/
+        catch (IOException e) {
+            e.printStackTrace();
+        } 
+
+    }
+        
     //check speex mode
-    public int checkMode(String s){
-        s = s.substring(1, 5);
-        mode = Integer.parseInt(s,2);
+    public int checkMode(String str){
+        str = str.substring(1, 5);
+        mode = Integer.parseInt(str,2);
         if (mode != 4 && mode != 5 && mode != 6){
             System.err.println("Usupported Speex mode!!!!");
             return -1;
@@ -103,34 +119,32 @@ public class SpeexFileReader {
     str - original voice sample (converted into 8-bit string representation)
     msg - converted message to hide (8-bit representation)
     m - mode of original voice sample 
+    Function inserts messag into input bit stream.
     */
     private String insertMessage(String str, String msg, int m){
         String[] arrayOfFrames;
         boolean endOfFile=false;
         boolean endOfMsg=false;
-        boolean endOfFrame=false;
+        boolean endOfFrame;
         int T = 0;
         int sfT = 0;
         int i = 0;
         int j = 0;
         int initIndexVQ = 0;
-        //int firstSubframe = 0;
         int numOfLSB = 0;
         int n = 1; //number of frame
         // initialize inserting message...
         switch(m){
             case 4:
                 System.out.println("Speex mode: 4");
-                T = 224;    //used to change index of next frame 
-                initIndexVQ = 75; // start or end index? 
-                //firstSubframe = 75;
-                sfT=48; // start of next InnovationVQ subframe is at initIndexVQ += n*sfT; gdzie n <1,3>                
+                T = 224;    
+                initIndexVQ = 75;  
+                sfT=48;              
                 break;
             case 5:
                 System.out.println("Speex mode: 5");
                 T = 304;
                 initIndexVQ = 104;
-                //firstSubframe = 104;
                 sfT=65; // 
                 break;
             case 6:
@@ -145,14 +159,8 @@ public class SpeexFileReader {
                 break;
         }
         
-        System.out.println(T + "\n" + initIndexVQ + "\n" + sfT);
-        
-        StringBuilder originalStr = new StringBuilder(str);
-        StringBuilder msgToHide = new StringBuilder(msg);
-        
-       
-        
-        System.out.println(originalStr.length() + "\n" + "Number of bits to hide: " + msgToHide.length());
+        System.out.println("T    " + T + "\n" + "IVQ  " + initIndexVQ + "\n" + "sfT  " + sfT);
+        System.out.println(str.length() + "\n" + "Number of bits to hide: " + msg.length());
         // scan for value how much LSB bits we want to use //
         while(numOfLSB < 1)
         {
@@ -185,49 +193,51 @@ public class SpeexFileReader {
         arrayOfFrames = divideIntoFrames(str, mode);
         String tmpMsg;
         while(!endOfFile && !endOfMsg){
-            
-            if(endOfFile){
-                return str;
-            }
-            else if (endOfMsg){
-                return str;
-            }
-            else{
+
                 endOfFrame = false;
-                while(!endOfFrame){
-                    if (j + numOfLSB >= msgToHide.length()){                                
-                        tmpMsg = msgToHide.substring(j, msgToHide.length());
+                StringBuffer sb = new StringBuffer(arrayOfFrames[i]);
+                while(!endOfFrame && !endOfMsg){
+                    if (j + numOfLSB >= msg.length()){                                
+                        tmpMsg = msg.substring(j, msg.length());
                         endOfMsg = true;
+                        System.out.println("Loop finished due to end of message, frames affected:" + (i+1));
                         System.out.println("last message " + tmpMsg);
                     }
                     else{
-                        tmpMsg = msgToHide.substring(j, j+numOfLSB);
+                        tmpMsg = msg.substring(j, j+numOfLSB);
                         System.out.println("extracted from m2h " + tmpMsg);
-                        j +=  numOfLSB;                                       // to troche nie tak, nie mogę umieścić całej wiadomości w jednej ramce
+                        j +=  numOfLSB;                                      
                     }
-                    System.out.println("before: " + arrayOfFrames[i].length());
-                    arrayOfFrames[i] = arrayOfFrames[i].replace(arrayOfFrames[i].substring(initIndexVQ - tmpMsg.length() + 1, initIndexVQ+1), tmpMsg);
-                    System.out.println("after : " + arrayOfFrames[i].length());
+                    System.out.println("before: " + i + " "+ sb);
+                    sb = sb.replace(initIndexVQ - tmpMsg.length() + 1, initIndexVQ+1, tmpMsg);  // tutaj potrzebny jest jakis SB
+                    arrayOfFrames[i] = sb.toString();
+                    System.out.println("after : " + i + " "+ arrayOfFrames[i]);
                     initIndexVQ += sfT;
                     n+=1;
                     if(n == 5){
-                        initIndexVQ = 75;
+                        if (mode == 4) initIndexVQ = 75;
+                        else if (mode == 5) initIndexVQ = 104;
+                        else if (mode == 6) initIndexVQ = 120;
                         i+=1;
                         n=1;
                         endOfFrame = true;
                     }
-                }
-                if(i == arrayOfFrames.length){
-                    endOfFile = true;
-                }
                 
-            }    
+                }
+    
+            if(i == arrayOfFrames.length){
+                System.out.println("Loop finished due to end of file");
+                endOfFile = true;
+            }
             
-            
-            
-            
-        }  
-        return "";
+        }
+        
+        StringBuilder sb = new StringBuilder();
+        for (String s: arrayOfFrames){
+            sb.append(s);
+        }
+        
+        return sb.toString();
     }
     //Auxiliary functions
     public String[] divideIntoFrames (String str, int mode){
@@ -290,10 +300,12 @@ public class SpeexFileReader {
       String bitStringToHide = sfr.convertToBitString(dataToHide);
       
       File inputFile = new File(basePath + "H110mode4.bin"); // placing input file
-      String ad = sfr.readFile(inputFile);// string 
-      sfr.checkMode(ad);
-      sfr.insertMessage(ad, bitStringToHide, sfr.mode);      
-      //sfr.writeFile(sfr.binFile);
+      String inputFileString = sfr.readFile(inputFile);// string 
+      sfr.checkMode(inputFileString);
+      String strAfterInsert = sfr.insertMessage(inputFileString, bitStringToHide, sfr.mode);      
+      //System.out.println("\n" + inputFileString+ "\n");
+      //System.out.println(strAfterInsert.length());
+      sfr.writeFile(strAfterInsert);
       
     }
 
