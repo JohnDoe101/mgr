@@ -106,6 +106,7 @@ public class SpeexFileReader {
     */
     private String insertMessage(String str, String msg, int m){
         String[] arrayOfFrames;
+        boolean endOfFile=false;
         boolean endOfMsg=false;
         boolean endOfFrame=false;
         int T = 0;
@@ -146,7 +147,7 @@ public class SpeexFileReader {
         
         System.out.println(T + "\n" + initIndexVQ + "\n" + sfT);
         
-         StringBuilder originalStr = new StringBuilder(str);
+        StringBuilder originalStr = new StringBuilder(str);
         StringBuilder msgToHide = new StringBuilder(msg);
         
        
@@ -181,31 +182,50 @@ public class SpeexFileReader {
             }
             
         }
-        
-        while(j < str.length() || !endOfMsg){
-            arrayOfFrames = divideIntoFrames(str, mode);
-           
-            String tmpMsg;
+        arrayOfFrames = divideIntoFrames(str, mode);
+        String tmpMsg;
+        while(!endOfFile && !endOfMsg){
             
-            while(!endOfFrame)//when n <= 4
-            {
-                if (j + numOfLSB >= msgToHide.length()){                                
-                    tmpMsg = msgToHide.substring(j, msgToHide.length());
-                    System.out.println("last message " + tmpMsg);
+            if(endOfFile){
+                return str;
+            }
+            else if (endOfMsg){
+                return str;
             }
             else{
-                tmpMsg = msgToHide.substring(j, j+numOfLSB);
-                System.out.println("extracted from m2h " + tmpMsg);
-                j +=  numOfLSB;                                       // to troche nie tak, nie mogę umieścić całej wiadomości w jednej ramce
-            }
-                System.out.println(n + " " + tmpMsg);
-                n+=1;
-                if(n>4){
-                    endOfFrame = true;
-                    n=1;
+                endOfFrame = false;
+                while(!endOfFrame){
+                    if (j + numOfLSB >= msgToHide.length()){                                
+                        tmpMsg = msgToHide.substring(j, msgToHide.length());
+                        endOfMsg = true;
+                        System.out.println("last message " + tmpMsg);
+                    }
+                    else{
+                        tmpMsg = msgToHide.substring(j, j+numOfLSB);
+                        System.out.println("extracted from m2h " + tmpMsg);
+                        j +=  numOfLSB;                                       // to troche nie tak, nie mogę umieścić całej wiadomości w jednej ramce
+                    }
+                    System.out.println("before: " + arrayOfFrames[i].length());
+                    arrayOfFrames[i] = arrayOfFrames[i].replace(arrayOfFrames[i].substring(initIndexVQ - tmpMsg.length() + 1, initIndexVQ+1), tmpMsg);
+                    System.out.println("after : " + arrayOfFrames[i].length());
+                    initIndexVQ += sfT;
+                    n+=1;
+                    if(n == 5){
+                        initIndexVQ = 75;
+                        i+=1;
+                        n=1;
+                        endOfFrame = true;
+                    }
                 }
-            }
-            endOfMsg = true;
+                if(i == arrayOfFrames.length){
+                    endOfFile = true;
+                }
+                
+            }    
+            
+            
+            
+            
         }  
         return "";
     }
