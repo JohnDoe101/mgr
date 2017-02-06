@@ -7,9 +7,7 @@ package speexfilereader;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.BufferedWriter;
 import java.io.FileOutputStream;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.util.InputMismatchException;
 import java.util.Scanner;
@@ -299,7 +297,7 @@ public class SpeexFileReader {
       String dataToHide = "this is hidden message";
       String bitStringToHide = sfr.convertToBitString(dataToHide);
       
-      File inputFile = new File(basePath + "H110mode4.bin"); // placing input file
+      File inputFile = new File(basePath + "H110mode6.bin"); // placing input file
       String inputFileString = sfr.readFile(inputFile);// string 
       sfr.checkMode(inputFileString);
       String strAfterInsert = sfr.insertMessage(inputFileString, bitStringToHide, sfr.mode);      
