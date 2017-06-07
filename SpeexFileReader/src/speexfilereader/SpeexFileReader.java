@@ -262,6 +262,7 @@ public class SpeexFileReader {
         while( i < amountOfFrames)
         {
             arrayOfFrames[i] = str.substring(j, j + divisor);
+            System.out.println("this is the frame n: " + i + " " + arrayOfFrames[i]);
             j += divisor;
             i += 1;           
         }
@@ -291,20 +292,20 @@ public class SpeexFileReader {
    
     public static void main(String[] args){
       
-      String basePath = "C:\\Users\\Cz4p3L\\Desktop\\Studia\\Magisterka\\speech_samples\\H1\\"; //base path for speech sample files
+      String basePath = "C:\\Users\\Cz4p3L\\Desktop\\"; //base path for speech sample files
       
       SpeexFileReader sfr = new SpeexFileReader();
-      String dataToHide = "this is hidden message";
+      String dataToHide = "tajna wiadomosc do przekazania przy pomoxy Speex";
       String bitStringToHide = sfr.convertToBitString(dataToHide);
       
-      File inputFile = new File(basePath + "H110mode6.bin"); // placing input file
+      File inputFile = new File(basePath + "H11after.bin"); // placing input file
       String inputFileString = sfr.readFile(inputFile);// string 
       sfr.checkMode(inputFileString);
       String strAfterInsert = sfr.insertMessage(inputFileString, bitStringToHide, sfr.mode);      
       //System.out.println("\n" + inputFileString+ "\n");
-      //System.out.println(strAfterInsert.length());
-      sfr.writeFile(strAfterInsert);
       
+      sfr.writeFile(strAfterInsert);
+      System.out.println(strAfterInsert.length());
     }
 
 }
