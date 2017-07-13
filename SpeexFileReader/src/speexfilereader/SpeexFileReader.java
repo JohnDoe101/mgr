@@ -26,6 +26,7 @@ class CustomException extends Exception {
 public class SpeexFileReader {
     
     //global variables
+    int [][] vectorQuantizationIndexes;
     byte[] inputByteFile;    // file to read from
     byte[] outputByteFile;
     String[] binaryStr; // string with data to hide 
@@ -98,7 +99,7 @@ public class SpeexFileReader {
         }
         catch (IOException e) {
             e.printStackTrace();
-        } 
+        }
 
     }
         
@@ -241,28 +242,41 @@ public class SpeexFileReader {
     public String[] divideIntoFrames (String str, int mode){
         
         int divisor, amountOfFrames;
+        int idxSize, idxAmnt;   // number of bits 
         int i=0;
         int j=0;
         switch(mode){
             case 4:
+                idxSize = 7;
+                idxAmnt = 5;
                 divisor = 224;
                 break;
             case 5:
+                idxSize = 6;
+                idxAmnt = 8;
                 divisor = 304;
                 break;
             case 6:
+                idxSize = 8;
+                idxAmnt = 8;
                 divisor = 368;
                 break;
             default:
+                idxSize = 1;
+                idxAmnt = 1;
                 divisor = 1;
                 break;        
-        } 
+        }
+        if (idxSize == 1 && idxAmnt == 1 || divisor == 1) {
+            return null;
+        }
         amountOfFrames = str.length()/divisor;
+        vectorQuantizationIndexes = new int[amountOfFrames][4*idxAmnt];
         String arrayOfFrames[] = new String[amountOfFrames];
         while( i < amountOfFrames)
         {
             arrayOfFrames[i] = str.substring(j, j + divisor);
-            System.out.println("this is the frame n: " + i + " " + arrayOfFrames[i]);
+            getIndexVQ(arrayOfFrames[i], i, idxAmnt, idxSize);
             j += divisor;
             i += 1;           
         }
@@ -270,6 +284,9 @@ public class SpeexFileReader {
         return arrayOfFrames;
     }
     
+    public void getIndexVQ(String frame, int frameNo, int indexAmount, int indexBitSize){
+        vectorQuantizationIndexes[frameNo][0] = 1;    
+    }
     //Convert hidden message to array of strings, it is simplier to insert into stream
     private String convertToBitString(String str){
         if (str.length() == 0) 
@@ -289,7 +306,9 @@ public class SpeexFileReader {
         }       
         return binary.toString();
     }
-   
+/* 
+   Main function for testing steganographic method 
+   */   
     public static void main(String[] args){
       
       String basePath = "C:\\Users\\Cz4p3L\\Desktop\\"; //base path for speech sample files
