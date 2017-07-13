@@ -25,10 +25,26 @@ class CustomException extends Exception {
 
 public class SpeexFileReader {
     
-    //global variables
+    /* @Params:
+    vectorQuantizationIndexes
+    inputByteFile
+    outputByteFile
+    vqSize 
+    vqStart
+    sfT
+    idxSize 
+    idxAmnt
+    divisor
+    binaryStr 
+    binFile
+    mode    
+    */
     int [][] vectorQuantizationIndexes;
     byte[] inputByteFile;    // file to read from
     byte[] outputByteFile;
+    int vqSize, vqStart, sfT;
+    int idxSize, idxAmnt;
+    int divisor;
     String[] binaryStr; // string with data to hide 
     StringBuilder binFile = new StringBuilder();   //array of strings to write to
     int mode;
@@ -111,7 +127,45 @@ public class SpeexFileReader {
             System.err.println("Usupported Speex mode!!!!");
             return -1;
         }
+        setIdxVqParams(mode);
         return mode;
+    }
+    
+    
+    public void setIdxVqParams(int m){
+
+        switch(m){
+            case 4: 
+                vqSize = 35;
+                vqStart = 41;
+                sfT = 48;
+                idxSize = 7;
+                idxAmnt = 5;
+                divisor = 224;
+                break;
+            case 5:
+                vqSize = 48;
+                vqStart = 57;
+                sfT = 65;
+                idxSize = 6;
+                idxAmnt = 8;
+                divisor = 304;
+                break;
+            case 6:
+                vqSize = 64;
+                vqStart = 57;
+                sfT = 81;
+                idxSize = 8;
+                idxAmnt = 8;
+                divisor = 368;
+                break;
+            default: 
+                System.out.println("Unsupported Speex mode!!");
+                idxSize = 1;
+                idxAmnt = 1;
+                divisor = 1;
+                break;
+        }
     }
     /* Insert hidden message into bitstream
     @params         String str, String msg, int m
@@ -126,7 +180,6 @@ public class SpeexFileReader {
         boolean endOfMsg=false;
         boolean endOfFrame;
         int T = 0;
-        int sfT = 0;
         int i = 0;
         int j = 0;
         int initIndexVQ = 0;
@@ -138,20 +191,19 @@ public class SpeexFileReader {
                 System.out.println("Speex mode: 4");
                 T = 224;    
                 initIndexVQ = 75;  
-                sfT=48;              
+                //sfT=48;              
                 break;
             case 5:
                 System.out.println("Speex mode: 5");
                 T = 304;
                 initIndexVQ = 104;
-                sfT=65; // 
+                //sfT=65; // 
                 break;
             case 6:
                 System.out.println("Speex mode: 6");
                 T = 368;
                 initIndexVQ = 120;
-                //firstSubframe = 120;
-                sfT=81; //
+                //sfT=81; //
                 break;
             default: 
                 System.out.println("Unsupported Speex mode!!");
@@ -241,32 +293,11 @@ public class SpeexFileReader {
     //Auxiliary functions
     public String[] divideIntoFrames (String str, int mode){
         
-        int divisor, amountOfFrames;
-        int idxSize, idxAmnt;   // number of bits 
+        int amountOfFrames;
+           // number of bits 
         int i=0;
         int j=0;
-        switch(mode){
-            case 4:
-                idxSize = 7;
-                idxAmnt = 5;
-                divisor = 224;
-                break;
-            case 5:
-                idxSize = 6;
-                idxAmnt = 8;
-                divisor = 304;
-                break;
-            case 6:
-                idxSize = 8;
-                idxAmnt = 8;
-                divisor = 368;
-                break;
-            default:
-                idxSize = 1;
-                idxAmnt = 1;
-                divisor = 1;
-                break;        
-        }
+
         if (idxSize == 1 && idxAmnt == 1 || divisor == 1) {
             return null;
         }
