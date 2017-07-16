@@ -8,6 +8,7 @@ package speexfilereader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.InputMismatchException;
 import java.util.Scanner;
@@ -26,12 +27,14 @@ class CustomException extends Exception {
 public class SpeexFileReader {
     
     /* @Params:
-    vectorQuantizationIndexes
-    inputByteFile
-    outputByteFile
-    vqSize 
-    vqStart
-    sfT
+    vectorQuantizationIndexes   Array with all computed VQ indices used for encoding voice sample
+    inputByteFile               input binary file with encoded voice sample
+    outputByteFile              output binary file with  
+    vqSize                      
+    vqStart                     set to 0
+    sfT                         set according to mode 4/5/6, where VQ is 
+    frameT                      
+    initIndexVQ
     idxSize 
     idxAmnt
     divisor
@@ -42,8 +45,8 @@ public class SpeexFileReader {
     int [][] vectorQuantizationIndexes;
     byte[] inputByteFile;    // file to read from
     byte[] outputByteFile;
-    int vqSize, vqStart, sfT;
-    int idxSize, idxAmnt;
+    int vqSize, vqStart, sfT, frameT, initIndexVQ;
+    int idxSize, idxAmnt,idxStart;
     int divisor;
     String[] binaryStr; // string with data to hide 
     StringBuilder binFile = new StringBuilder();   //array of strings to write to
@@ -142,6 +145,8 @@ public class SpeexFileReader {
                 idxSize = 7;
                 idxAmnt = 5;
                 divisor = 224;
+                initIndexVQ = 75;
+                frameT = divisor;
                 break;
             case 5:
                 vqSize = 48;
@@ -150,6 +155,8 @@ public class SpeexFileReader {
                 idxSize = 6;
                 idxAmnt = 8;
                 divisor = 304;
+                initIndexVQ = 104;
+                frameT = divisor;
                 break;
             case 6:
                 vqSize = 64;
@@ -158,6 +165,8 @@ public class SpeexFileReader {
                 idxSize = 8;
                 idxAmnt = 8;
                 divisor = 368;
+                initIndexVQ = 120;
+                frameT = divisor;
                 break;
             default: 
                 System.out.println("Unsupported Speex mode!!");
@@ -165,6 +174,35 @@ public class SpeexFileReader {
                 idxAmnt = 1;
                 divisor = 1;
                 break;
+        }
+    }
+    /*
+    Function for sending VQ indices to file, for further processing
+    */
+    public void saveIndicesToFile(){
+        String basePath = "C:\\Users\\Cz4p3L\\Desktop\\";
+        String extension =".csv";
+        String fileName;
+        String outputFile;
+        Scanner sc = new Scanner(System.in);
+        System.out.println("Saving Indices...Please insert fileName...");
+        fileName = sc.nextLine();
+        outputFile = basePath + fileName + extension;
+        
+        try{
+            FileWriter fw = new FileWriter(outputFile);
+            int fr = 0;
+            for (int[] vqi : vectorQuantizationIndexes) {
+                for (int j = 0; j < vqi.length; j++) {
+                    fw.append(fr++ + ",");
+                    fw.append(Integer.toString(vqi[j]));
+                    fw.append("\n");
+                }
+            }
+            fw.close();
+        }
+        catch(Exception e){
+            System.err.println("Error while saving indices to file");
         }
     }
     /* Insert hidden message into bitstream
@@ -179,38 +217,13 @@ public class SpeexFileReader {
         boolean endOfFile=false;
         boolean endOfMsg=false;
         boolean endOfFrame;
-        int T = 0;
         int i = 0;
         int j = 0;
-        int initIndexVQ = 0;
         int numOfLSB = 0;
         int n = 1; //number of frame
         // initialize inserting message...
-        switch(m){
-            case 4:
-                System.out.println("Speex mode: 4");
-                T = 224;    
-                initIndexVQ = 75;  
-                //sfT=48;              
-                break;
-            case 5:
-                System.out.println("Speex mode: 5");
-                T = 304;
-                initIndexVQ = 104;
-                //sfT=65; // 
-                break;
-            case 6:
-                System.out.println("Speex mode: 6");
-                T = 368;
-                initIndexVQ = 120;
-                //sfT=81; //
-                break;
-            default: 
-                System.out.println("Unsupported Speex mode!!");
-                break;
-        }
         
-        System.out.println("T    " + T + "\n" + "IVQ  " + initIndexVQ + "\n" + "sfT  " + sfT);
+        System.out.println("T    " + frameT + "\n" + "IVQ  " + initIndexVQ + "\n" + "sfT  " + sfT);
         System.out.println(str.length() + "\n" + "Number of bits to hide: " + msg.length());
         // scan for value how much LSB bits we want to use //
         while(numOfLSB < 1)
@@ -242,6 +255,7 @@ public class SpeexFileReader {
             
         }
         arrayOfFrames = divideIntoFrames(str, mode);
+        saveIndicesToFile();
         String tmpMsg;
         while(!endOfFile && !endOfMsg){
 
@@ -294,7 +308,7 @@ public class SpeexFileReader {
     public String[] divideIntoFrames (String str, int mode){
         
         int amountOfFrames;
-           // number of bits 
+        idxStart=0; 
         int i=0;
         int j=0;
 
@@ -307,7 +321,7 @@ public class SpeexFileReader {
         while( i < amountOfFrames)
         {
             arrayOfFrames[i] = str.substring(j, j + divisor);
-            getIndexVQ(arrayOfFrames[i], i, idxAmnt, idxSize);
+            getIndexVQ(arrayOfFrames[i], i, idxAmnt, idxSize,idxStart);
             j += divisor;
             i += 1;           
         }
@@ -315,8 +329,31 @@ public class SpeexFileReader {
         return arrayOfFrames;
     }
     
-    public void getIndexVQ(String frame, int frameNo, int indexAmount, int indexBitSize){
-        vectorQuantizationIndexes[frameNo][0] = 1;    
+    public void getIndexVQ(String frame, int frameNo, int indexAmount, int indexBitSize, int indexStart){
+        String tmpVQ; //vector quantization indices from subframe
+        boolean eoVQ;//end of frame
+        int j,k,l,m;
+        l=0;
+        j=vqStart;
+        //System.out.println("start: " + frameNo);
+        for(int i=0; i<4;i++){            
+            k=indexAmount;
+            m=indexStart;
+            tmpVQ = frame.substring(j,j+vqSize);
+            //System.out.println("tmpVQ " + tmpVQ + "\n " + i);
+            //System.out.println("length of VQ" + tmpVQ.length() + "\nVQ content " + tmpVQ);
+            do{
+                vectorQuantizationIndexes[frameNo][l++] = Integer.parseInt(tmpVQ.substring(m, m + indexBitSize), 2);        // i-th frame,
+                //System.out.println("vectorQuantizationIndexes[i][l-1]" + vectorQuantizationIndexes[frameNo][l-1]);
+                m+=indexBitSize;
+                k--;
+                eoVQ = k==0;
+            }
+            while(!eoVQ);
+            j += sfT;
+        }
+        //System.out.println("end");
+        j=vqStart;        
     }
     //Convert hidden message to array of strings, it is simplier to insert into stream
     private String convertToBitString(String str){
@@ -348,7 +385,7 @@ public class SpeexFileReader {
       String dataToHide = "tajna wiadomosc do przekazania przy pomoxy Speex";
       String bitStringToHide = sfr.convertToBitString(dataToHide);
       
-      File inputFile = new File(basePath + "H11after.bin"); // placing input file
+      File inputFile = new File(basePath + "H11.bin"); // placing input file
       String inputFileString = sfr.readFile(inputFile);// string 
       sfr.checkMode(inputFileString);
       String strAfterInsert = sfr.insertMessage(inputFileString, bitStringToHide, sfr.mode);      
