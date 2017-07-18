@@ -12,6 +12,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.InputMismatchException;
 import java.util.Scanner;
+import org.jfree.chart.*;
 
 /* Author: Łukasz Czapla */
 class CustomException extends Exception {
@@ -24,23 +25,23 @@ class CustomException extends Exception {
     }
 }
 
-public class SpeexFileReader {
+public class SpeexFileReader implements CodewordEnergy{
     
     /* @Params:
     vectorQuantizationIndexes   Array with all computed VQ indices used for encoding voice sample
-    inputByteFile               input binary file with encoded voice sample
-    outputByteFile              output binary file with  
-    vqSize                      
-    vqStart                     set to 0
-    sfT                         set according to mode 4/5/6, where VQ is 
-    frameT                      
-    initIndexVQ
-    idxSize 
-    idxAmnt
-    divisor
-    binaryStr 
-    binFile
-    mode    
+    inputByteFile               Input binary file with encoded voice sample
+    outputByteFile              Output binary file with hidden message 
+    vqSize                      Amount of bits spent on VQ parameter. Based on Speex mode 
+    vqStart                     Set to 0
+    sfT                         Set based on used Speex mode: 4/5/6. Parameter defines repetition of subframe params 
+    frameT                      Size of frame in bits 
+    initIndexVQ                 Indicates last bit of last VQ index. Based on used mode
+    idxSize                     Size of index in bits. Based on used mode
+    idxAmnt                     Amount of indexes in VQ parameter per subframe
+    divisor                     Variable used for count amount of frames in sample of voice
+    binaryStr                   String with data to hide
+    binFile                     Array of strings to write to
+    mode                        Calculated Speex mode based on input file
     */
     int [][] vectorQuantizationIndexes;
     byte[] inputByteFile;    // file to read from
