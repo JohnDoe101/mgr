@@ -11,8 +11,10 @@ import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.InputMismatchException;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.Scanner;
-import org.jfree.chart.*;
+//import org.jfree.chart.*;
 
 /* Author: Łukasz Czapla */
 class CustomException extends Exception {
@@ -25,7 +27,7 @@ class CustomException extends Exception {
     }
 }
 
-public class SpeexFileReader implements CodewordEnergy{
+public class SpeexFileReader implements CodewordEnergy {
     
     /* @Params:
     vectorQuantizationIndexes   Array with all computed VQ indices used for encoding voice sample
@@ -58,7 +60,7 @@ public class SpeexFileReader implements CodewordEnergy{
     {   
         FileInputStream fileInputStream;
         inputByteFile = new byte[(int) inputFile.length()];
-        System.out.println("Length of input file" + inputFile.length());
+        //System.out.println("Length of input file" + inputFile.length());
         try
         { 
             fileInputStream = new FileInputStream(inputFile);
@@ -77,7 +79,7 @@ public class SpeexFileReader implements CodewordEnergy{
             }
             
             //System.out.println(binFile);
-            System.out.println("Number of bits read from input file: " + 8 * inputByteFile.length);
+            //System.out.println("Number of bits read from input file: " + 8 * inputByteFile.length);
         }
         catch (Exception e){
             e.printStackTrace();
@@ -148,6 +150,7 @@ public class SpeexFileReader implements CodewordEnergy{
                 divisor = 224;
                 initIndexVQ = 75;
                 frameT = divisor;
+                initEnergyMap(codewordEnergyMode4, codewordEnergyMapMode4);
                 break;
             case 5:
                 vqSize = 48;
@@ -158,6 +161,7 @@ public class SpeexFileReader implements CodewordEnergy{
                 divisor = 304;
                 initIndexVQ = 104;
                 frameT = divisor;
+                initEnergyMap(codewordEnergyMode5, codewordEnergyMapMode5);
                 break;
             case 6:
                 vqSize = 64;
@@ -168,6 +172,7 @@ public class SpeexFileReader implements CodewordEnergy{
                 divisor = 368;
                 initIndexVQ = 120;
                 frameT = divisor;
+                initEnergyMap(codewordEnergyMode6, codewordEnergyMapMode6);
                 break;
             default: 
                 System.out.println("Unsupported Speex mode!!");
@@ -224,10 +229,11 @@ public class SpeexFileReader implements CodewordEnergy{
         int n = 1; //number of frame
         // initialize inserting message...
         
-        System.out.println("T    " + frameT + "\n" + "IVQ  " + initIndexVQ + "\n" + "sfT  " + sfT);
-        System.out.println(str.length() + "\n" + "Number of bits to hide: " + msg.length());
+        //System.out.println("T    " + frameT + "\n" + "IVQ  " + initIndexVQ + "\n" + "sfT  " + sfT);
+        //System.out.println(str.length() + "\n" + "Number of bits to hide: " + msg.length());
         // scan for value how much LSB bits we want to use //
-        while(numOfLSB < 1)
+        numOfLSB =1;
+        /*while(numOfLSB < 1)
         {
             try{
                 Scanner sc = new Scanner(System.in);
@@ -254,10 +260,13 @@ public class SpeexFileReader implements CodewordEnergy{
                 System.out.println("Input mismatch exception: " + e + "\nYou should use number!");
             }
             
-        }
+        }*/
         arrayOfFrames = divideIntoFrames(str, mode);
-        saveIndicesToFile();
-        String tmpMsg;
+        checkSubstitutionCapability(vectorQuantizationIndexes, refactorizedCodewordMap);
+        //saveIndicesToFile();
+        return "";
+        /*String tmpMsg;
+        
         while(!endOfFile && !endOfMsg){
 
                 endOfFrame = false;
@@ -303,7 +312,7 @@ public class SpeexFileReader implements CodewordEnergy{
             sb.append(s);
         }
         
-        return sb.toString();
+        return sb.toString();*/
     }
     //Auxiliary functions
     public String[] divideIntoFrames (String str, int mode){
@@ -328,6 +337,21 @@ public class SpeexFileReader implements CodewordEnergy{
         }
         
         return arrayOfFrames;
+    }
+    
+    
+    public void checkSubstitutionCapability(int[][] idxArr, Map<Integer, Integer> refedMap){
+        int counter=0;
+        int all=0;
+        for(int[] i: idxArr){
+            for(int j=0;j<i.length;j++){
+                all++;
+                if (i[j] != refedMap.get(i[j]) ){
+                    counter++;
+                }
+            }
+        }
+        System.out.println("counter: " + counter + "\nAll: " + all + "\npercentage: " + (float)counter*100/all +" %");    
     }
     
     public void getIndexVQ(String frame, int frameNo, int indexAmount, int indexBitSize, int indexStart){
@@ -375,25 +399,114 @@ public class SpeexFileReader implements CodewordEnergy{
         }       
         return binary.toString();
     }
+    /*
+    Use of this function is to initialize EnegyMap for specific mode
+    Needed for further processing.
+    */
+    public void initEnergyMap(float[] cdbk, Map<Integer,Float> m){
+        int k = 0;
+        int threshold = 0;
+        for(float v: cdbk){
+            m.put(k, v);
+            refactorizedCodewordMap.put(k, k);  // init refactorized energy map with unchanged values. If better index couldn't be find we left original.
+            k++;
+        }
+        //displayMap(m);
+        //System.out.println("Refactorizing CodewordEnergy Map...");
+        /*do{
+            try{
+                Scanner sc = new Scanner(System.in);
+                System.out.println("Give acceptable threshold...");
+                threshold = sc.nextInt();             
+            }
+            catch(InputMismatchException e){
+                threshold = 0;              
+            }           
+        }while(threshold==0);*/
+        threshold = 9;
+        refactorEnergyMap(m, refactorizedCodewordMap,threshold);
+        int chC=0;
+        for(int w=0; w < refactorizedCodewordMap.size(); w++){
+            if (w != refactorizedCodewordMap.get(w)) chC++; 
+        }
+        //System.out.println("chC " + (float)chC/(1<<idxSize) * 100 + " %");
+    }
+    
+    /*
+    
+    */
+    public void displayMap(Map<Integer,Double> m){
+        System.out.println("item "+m.get(0));
+    }
+    /*
+    Function used for refactorization codeword energy Map. If finds possible redundancy in 0-1 
+    codebook index notation. Function rely on provided by user threshold in "%" ( maximum 
+    applicable decrease of original odeword energy and new codeword).
+    */
+    public void refactorEnergyMap(Map<Integer,Float> m, Map<Integer, Integer> m2, int threshold){
+        float item, next;
+        float tmpItem;
+        String _old, _new;
+        
+        for (int i=0; i<m.size(); i++){
+            item = m.get(i);
+            tmpItem = item * (1.f - (float)(threshold*0.01f));
+            //System.out.println("tmItem: " + tmpItem);
+            for(int j=0;j<m.size();j++){
+                if (i == j) continue;
+                next = m.get(j);
+                //System.out.println("item: " + item);
+                //System.out.println("next: " + next);
+                if (item <= next){
+                    continue;
+                } 
+                else{                   
+                    //System.out.println("tmpItem: " + tmpItem);
+                    if (tmpItem <= next){ //   if tmpItem<next<item then replace
+                        _old = Integer.toBinaryString(i);
+                        _new = Integer.toBinaryString(j);
+                        //_old = String.format("%6s", Integer.toBinaryString(i)).replace(' ', '0'); //Integer.toBinaryString(i);
+                        //_new = String.format("%6s", Integer.toBinaryString(j)).replace(' ', '0');
+                        if (_old.length() > _new.length()){
+                            m2.replace(i, j);
+                        }
+                        //System.out.println("old " + _old + " i " + i);
+                        //System.out.println("new " + _new + " j " + j);                        
+                    }
+                    else{    
+                        continue;
+                    }
+                }                
+            }
+        }
+    }
 /* 
    Main function for testing steganographic method 
    */   
     public static void main(String[] args){
       
-      String basePath = "C:\\Users\\Cz4p3L\\Desktop\\"; //base path for speech sample files
+      String basePath = "C:\\Users\\Cz4p3L\\Desktop\\Studia\\Magisterka\\speech_samples\\H1\\"; //base path for speech sample files
+      String[] sampleArrFile = {"H11mode4.bin", "H12mode4.bin","H13mode4.bin","H14mode4.bin","H15mode4.bin","H16mode4.bin","H17mode4.bin","H18mode4.bin","H19mode4.bin","H110mode4.bin",
+                                "H11mode5.bin","H12mode5.bin","H13mode5.bin","H14mode5.bin","H15mode5.bin","H16mode5.bin","H17mode5.bin","H18mode5.bin","H19mode5.bin","H110mode5.bin",
+                                "H11mode6.bin","H12mode6.bin","H13mode6.bin","H14mode6.bin","H15mode6.bin","H16mode6.bin","H17mode6.bin","H18mode6.bin","H19mode6.bin","H110mode6.bin"};
       
+      for (String str: sampleArrFile){
+          refactorizedCodewordMap.clear();
+          System.out.println("Sample fileName: " + str); 
       SpeexFileReader sfr = new SpeexFileReader();
       String dataToHide = "tajna wiadomosc do przekazania przy pomoxy Speex";
       String bitStringToHide = sfr.convertToBitString(dataToHide);
       
-      File inputFile = new File(basePath + "H11.bin"); // placing input file
+      File inputFile = new File(basePath + str); // placing input file
       String inputFileString = sfr.readFile(inputFile);// string 
       sfr.checkMode(inputFileString);
-      String strAfterInsert = sfr.insertMessage(inputFileString, bitStringToHide, sfr.mode);      
+      String strAfterInsert = sfr.insertMessage(inputFileString, bitStringToHide, sfr.mode);
+      
+      }      
       //System.out.println("\n" + inputFileString+ "\n");
       
-      sfr.writeFile(strAfterInsert);
-      System.out.println(strAfterInsert.length());
+      //sfr.writeFile(strAfterInsert);
+      //System.out.println(strAfterInsert.length());
     }
 
 }
