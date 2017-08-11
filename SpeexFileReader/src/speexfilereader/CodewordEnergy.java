@@ -21,6 +21,8 @@ public interface CodewordEnergy {
     
     Map<Integer, Integer> refactorizedCodewordMap = new HashMap<>();
     
+    Map<Integer, Integer> bitRedundancyMap = new HashMap<>();
+    
     static final float[] codewordEnergyMode4 = {
                                                         1.9737711f,
                                                         5.901472f,

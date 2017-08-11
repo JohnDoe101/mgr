@@ -129,6 +129,7 @@ public class SpeexFileReader implements CodewordEnergy {
     public int checkMode(String str){
         str = str.substring(1, 5);
         mode = Integer.parseInt(str,2);
+        System.out.println("mode: " + mode);
         if (mode != 4 && mode != 5 && mode != 6){
             System.err.println("Usupported Speex mode!!!!");
             return -1;
@@ -412,8 +413,8 @@ public class SpeexFileReader implements CodewordEnergy {
             k++;
         }
         //displayMap(m);
-        //System.out.println("Refactorizing CodewordEnergy Map...");
-        /*do{
+        System.out.println("Refactorizing CodewordEnergy Map...");
+        do{
             try{
                 Scanner sc = new Scanner(System.in);
                 System.out.println("Give acceptable threshold...");
@@ -422,13 +423,15 @@ public class SpeexFileReader implements CodewordEnergy {
             catch(InputMismatchException e){
                 threshold = 0;              
             }           
-        }while(threshold==0);*/
-        threshold = 9;
+        }while(threshold==0);
+        //threshold = 15;
         refactorEnergyMap(m, refactorizedCodewordMap,threshold);
         int chC=0;
         for(int w=0; w < refactorizedCodewordMap.size(); w++){
             if (w != refactorizedCodewordMap.get(w)) chC++; 
         }
+        System.out.println("refed Map:\n " + refactorizedCodewordMap);
+        System.out.println("bit redundancy map:\n" + bitRedundancyMap);
         //System.out.println("chC " + (float)chC/(1<<idxSize) * 100 + " %");
     }
     
@@ -436,7 +439,7 @@ public class SpeexFileReader implements CodewordEnergy {
     
     */
     public void displayMap(Map<Integer,Double> m){
-        System.out.println("item "+m.get(0));
+        System.out.println("map "+m.values());
     }
     /*
     Function used for refactorization codeword energy Map. If finds possible redundancy in 0-1 
@@ -447,27 +450,38 @@ public class SpeexFileReader implements CodewordEnergy {
         float item, next;
         float tmpItem;
         String _old, _new;
+        int _oldSize, _newSize;
+        int redundancy =0;
         
         for (int i=0; i<m.size(); i++){
+            if (i>2) continue;
             item = m.get(i);
             tmpItem = item * (1.f - (float)(threshold*0.01f));
+            //System.out.println("Item: " + item);
             //System.out.println("tmItem: " + tmpItem);
+            _old = Integer.toBinaryString(i);
+            _oldSize = _old.length();
+            
             for(int j=0;j<m.size();j++){
                 if (i == j) continue;
+                _new = Integer.toBinaryString(j);
+                
                 next = m.get(j);
-                //System.out.println("item: " + item);
-                //System.out.println("next: " + next);
+                System.out.println("tmpitem: " + tmpItem);
+                System.out.println("next: " + next);
                 if (item <= next){
                     continue;
                 } 
                 else{                   
                     //System.out.println("tmpItem: " + tmpItem);
-                    if (tmpItem <= next){ //   if tmpItem<next<item then replace
-                        _old = Integer.toBinaryString(i);
-                        _new = Integer.toBinaryString(j);
-                        //_old = String.format("%6s", Integer.toBinaryString(i)).replace(' ', '0'); //Integer.toBinaryString(i);
-                        //_new = String.format("%6s", Integer.toBinaryString(j)).replace(' ', '0');
-                        if (_old.length() > _new.length()){
+                    if (next >= tmpItem){ //   if tmpItem<next<item then replace
+                        _newSize = _new.length();
+                        if (_oldSize > _newSize){
+                            System.out.println("_old " + _old);
+                            System.out.println("_new " + _new);
+                            System.out.println("_oldSize" + _oldSize);
+                            System.out.println("_newSize" + _newSize);
+                            if (_oldSize - _newSize > redundancy) redundancy = _oldSize - _newSize;
                             m2.replace(i, j);
                         }
                         //System.out.println("old " + _old + " i " + i);
@@ -478,26 +492,32 @@ public class SpeexFileReader implements CodewordEnergy {
                     }
                 }                
             }
+            bitRedundancyMap.put(i, redundancy);
+            redundancy = 0;
         }
+        
     }
 /* 
    Main function for testing steganographic method 
    */   
     public static void main(String[] args){
       
-      String basePath = "C:\\Users\\Cz4p3L\\Desktop\\Studia\\Magisterka\\speech_samples\\H1\\"; //base path for speech sample files
-      String[] sampleArrFile = {"H11mode4.bin", "H12mode4.bin","H13mode4.bin","H14mode4.bin","H15mode4.bin","H16mode4.bin","H17mode4.bin","H18mode4.bin","H19mode4.bin","H110mode4.bin",
+      String basePath = "C:\\Users\\Cz4p3L\\Desktop\\Studia\\Magisterka\\speech_samples\\H57\\"; //base path for speech sample files
+      /*String[] sampleArrFile = {"H11mode4.bin", "H12mode4.bin","H13mode4.bin","H14mode4.bin","H15mode4.bin","H16mode4.bin","H17mode4.bin","H18mode4.bin","H19mode4.bin","H110mode4.bin",
                                 "H11mode5.bin","H12mode5.bin","H13mode5.bin","H14mode5.bin","H15mode5.bin","H16mode5.bin","H17mode5.bin","H18mode5.bin","H19mode5.bin","H110mode5.bin",
-                                "H11mode6.bin","H12mode6.bin","H13mode6.bin","H14mode6.bin","H15mode6.bin","H16mode6.bin","H17mode6.bin","H18mode6.bin","H19mode6.bin","H110mode6.bin"};
-      
-      for (String str: sampleArrFile){
-          refactorizedCodewordMap.clear();
-          System.out.println("Sample fileName: " + str); 
+                                "H11mode6.bin","H12mode6.bin","H13mode6.bin","H14mode6.bin","H15mode6.bin","H16mode6.bin","H17mode6.bin","H18mode6.bin","H19mode6.bin","H110mode6.bin"};*/
+      String[] sampleArrFile = {"H571mode4.bin", "H572mode4.bin","H573mode4.bin","H574mode4.bin","H575mode4.bin","H576mode4.bin","H577mode4.bin","H578mode4.bin","H579mode4.bin","H5710mode4.bin",
+                                "H571mode5.bin","H572mode5.bin","H573mode5.bin","H574mode5.bin","H575mode5.bin","H576mode5.bin","H577mode5.bin","H578mode5.bin","H579mode5.bin","H5710mode5.bin",
+                                "H571mode6.bin","H572mode6.bin","H573mode6.bin","H574mode6.bin","H575mode6.bin","H576mode6.bin","H577mode6.bin","H578mode6.bin","H579mode6.bin","H5710mode6.bin"};
+      String file  = "H571mode4.bin";
+      //for (String str: sampleArrFile){
+      //    refactorizedCodewordMap.clear();
+      System.out.println("Sample fileName: " + file); 
       SpeexFileReader sfr = new SpeexFileReader();
       String dataToHide = "tajna wiadomosc do przekazania przy pomoxy Speex";
       String bitStringToHide = sfr.convertToBitString(dataToHide);
       
-      File inputFile = new File(basePath + str); // placing input file
+      File inputFile = new File(basePath + file); // placing input file
       String inputFileString = sfr.readFile(inputFile);// string 
       sfr.checkMode(inputFileString);
       String strAfterInsert = sfr.insertMessage(inputFileString, bitStringToHide, sfr.mode);
@@ -507,6 +527,6 @@ public class SpeexFileReader implements CodewordEnergy {
       
       //sfr.writeFile(strAfterInsert);
       //System.out.println(strAfterInsert.length());
-    }
+    //}
 
 }
