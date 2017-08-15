@@ -54,7 +54,10 @@ public class SpeexFileReader implements CodewordEnergy {
     String[] binaryStr; // string with data to hide 
     StringBuilder binFile = new StringBuilder();   //array of strings to write to
     int mode;
+    int efficiency;
     
+    static int USE_LSB_METHOD, USE_CRIS_METHOD;
+        
     //reading input Speex stream
     public String readFile(File inputFile)
     {   
@@ -151,7 +154,6 @@ public class SpeexFileReader implements CodewordEnergy {
                 divisor = 224;
                 initIndexVQ = 75;
                 frameT = divisor;
-                initEnergyMap(codewordEnergyMode4, codewordEnergyMapMode4);
                 break;
             case 5:
                 vqSize = 48;
@@ -162,7 +164,7 @@ public class SpeexFileReader implements CodewordEnergy {
                 divisor = 304;
                 initIndexVQ = 104;
                 frameT = divisor;
-                initEnergyMap(codewordEnergyMode5, codewordEnergyMapMode5);
+                //initEnergyMap(codewordEnergyMode5, codewordEnergyMapMode5);
                 break;
             case 6:
                 vqSize = 64;
@@ -173,7 +175,7 @@ public class SpeexFileReader implements CodewordEnergy {
                 divisor = 368;
                 initIndexVQ = 120;
                 frameT = divisor;
-                initEnergyMap(codewordEnergyMode6, codewordEnergyMapMode6);
+                //SinitEnergyMap(codewordEnergyMode6, codewordEnergyMapMode6);
                 break;
             default: 
                 System.out.println("Unsupported Speex mode!!");
@@ -220,7 +222,7 @@ public class SpeexFileReader implements CodewordEnergy {
     Function inserts messag into input bit stream.
     */
     private String insertMessage(String str, String msg, int m){
-        String[] arrayOfFrames;
+        String[] arrayOfFrames = null;
         boolean endOfFile=false;
         boolean endOfMsg=false;
         boolean endOfFrame;
@@ -228,92 +230,161 @@ public class SpeexFileReader implements CodewordEnergy {
         int j = 0;
         int numOfLSB = 0;
         int n = 1; //number of frame
-        // initialize inserting message...
+        int usedMethod=0;
+        
+        System.out.println("Which method would you like to use? ( LSB:1 / CRIS:2 )");
+        do {
+            Scanner scan = new Scanner(System.in);
+            try{
+                usedMethod = scan.nextInt();
+            }
+            catch(InputMismatchException e){
+                System.out.println("Wrong format");
+            }
+        }while(usedMethod != USE_CRIS_METHOD && usedMethod != USE_LSB_METHOD);
+            
         
         //System.out.println("T    " + frameT + "\n" + "IVQ  " + initIndexVQ + "\n" + "sfT  " + sfT);
         //System.out.println(str.length() + "\n" + "Number of bits to hide: " + msg.length());
         // scan for value how much LSB bits we want to use //
-        numOfLSB =1;
-        /*while(numOfLSB < 1)
-        {
-            try{
-                Scanner sc = new Scanner(System.in);
-                System.out.println("How many LSB bits from InnovationVQ you want to use?");
-                numOfLSB = sc.nextInt();
-                try {
-                    if (mode == 4 & numOfLSB > 35){                    
-                        throw new CustomException();
-                    }               
-                    if (mode == 5 & numOfLSB > 48){
-                        throw new CustomException();
-                    }                   
-                    if (mode == 6 & numOfLSB > 64){
-                        throw new CustomException();         
-                    }                                        
-                }                
-                catch (CustomException e){
-                    numOfLSB = 0;
-                    System.out.println("You exceeded IVQ bit limit for mode " + mode + " !!" );
-                }
-                
-            }
-            catch(InputMismatchException e){
-                System.out.println("Input mismatch exception: " + e + "\nYou should use number!");
-            }
-            
-        }*/
-        arrayOfFrames = divideIntoFrames(str, mode);
-        checkSubstitutionCapability(vectorQuantizationIndexes, refactorizedCodewordMap);
-        //saveIndicesToFile();
-        return "";
-        /*String tmpMsg;
         
-        while(!endOfFile && !endOfMsg){
+        if (usedMethod == USE_LSB_METHOD){
+            while (numOfLSB < 1) {
+                try {
+                    Scanner sc = new Scanner(System.in);
+                    System.out.println("How many LSB bits from InnovationVQ you want to use?");
+                    numOfLSB = sc.nextInt();
+                    try {
+                        if (mode == 4 & numOfLSB > 35) {
+                            throw new CustomException();
+                        }
+                        if (mode == 5 & numOfLSB > 48) {
+                            throw new CustomException();
+                        }
+                        if (mode == 6 & numOfLSB > 64) {
+                            throw new CustomException();
+                        }
+                    } catch (CustomException e) {
+                        numOfLSB = 0;
+                        System.out.println("You exceeded IVQ bit limit for mode " + mode + " !!");
+                    }
+
+                } catch (InputMismatchException e) {
+                    System.out.println("Input mismatch exception: " + e + "\nYou should use number!");
+                }
+
+            }
+            arrayOfFrames = divideIntoFrames(str, mode);
+            //checkSubstitutionCapability(vectorQuantizationIndexes, refactorizedCodewordMap);
+            //saveIndicesToFile();
+            String tmpMsg;
+
+            while (!endOfFile && !endOfMsg) {
 
                 endOfFrame = false;
                 StringBuffer sb = new StringBuffer(arrayOfFrames[i]);
-                while(!endOfFrame && !endOfMsg){
-                    if (j + numOfLSB >= msg.length()){                                
+                while (!endOfFrame && !endOfMsg) {
+                    if (j + numOfLSB >= msg.length()) {
                         tmpMsg = msg.substring(j, msg.length());
                         endOfMsg = true;
-                        System.out.println("Loop finished due to end of message, frames affected:" + (i+1));
-                        System.out.println("last message " + tmpMsg);
+                        System.out.println("Loop finished due to end of message, frames affected:" + (i + 1));
+                        //System.out.println("last message " + tmpMsg);
+                    } else {
+                        tmpMsg = msg.substring(j, j + numOfLSB);
+                        //System.out.println("extracted from m2h " + tmpMsg);
+                        j += numOfLSB;
                     }
-                    else{
-                        tmpMsg = msg.substring(j, j+numOfLSB);
-                        System.out.println("extracted from m2h " + tmpMsg);
-                        j +=  numOfLSB;                                      
-                    }
-                    System.out.println("before: " + i + " "+ sb);
-                    sb = sb.replace(initIndexVQ - tmpMsg.length() + 1, initIndexVQ+1, tmpMsg);  // tutaj potrzebny jest jakis SB
+                    //System.out.println("before: " + i + " " + sb);
+                    sb = sb.replace(initIndexVQ - tmpMsg.length() + 1, initIndexVQ + 1, tmpMsg);  // tutaj potrzebny jest jakis SB
                     arrayOfFrames[i] = sb.toString();
-                    System.out.println("after : " + i + " "+ arrayOfFrames[i]);
+                    //System.out.println("after : " + i + " " + arrayOfFrames[i]);
                     initIndexVQ += sfT;
-                    n+=1;
-                    if(n == 5){
-                        if (mode == 4) initIndexVQ = 75;
-                        else if (mode == 5) initIndexVQ = 104;
-                        else if (mode == 6) initIndexVQ = 120;
-                        i+=1;
-                        n=1;
+                    n += 1;
+                    if (n == 5) {
+                        if (mode == 4) {
+                            initIndexVQ = 75;
+                        } else if (mode == 5) {
+                            initIndexVQ = 104;
+                        } else if (mode == 6) {
+                            initIndexVQ = 120;
+                        }
+                        i += 1;
+                        n = 1;
                         endOfFrame = true;
                     }
-                
+
                 }
-    
-            if(i == arrayOfFrames.length){
-                System.out.println("Loop finished due to end of file");
-                endOfFile = true;
+
+                if (i == arrayOfFrames.length) {
+                    System.out.println("Loop finished due to end of file");
+                    endOfFile = true;
+                }
+            }
+        }
+        else if (usedMethod == USE_CRIS_METHOD){
+            switch(mode){
+                case 4:
+                    initEnergyMap(codewordEnergyMode4, codewordEnergyMapMode4);
+                    break;
+                case 5:
+                    initEnergyMap(codewordEnergyMode5, codewordEnergyMapMode5);
+                    break;
+                case 6:
+                    initEnergyMap(codewordEnergyMode6, codewordEnergyMapMode6);
+                    break;
+                default:
+                    break;
+            }
+            arrayOfFrames = divideIntoFrames(str, mode);
+            Scanner sc1 = new Scanner(System.in);
+            efficiency = 0;
+            System.out.println("Provide hiding efficiency:");
+            do{
+                try{
+                    efficiency = sc1.nextInt();
+                }
+                catch(InputMismatchException e){
+                    System.out.println("Wrong format");
+                }
+            }
+            while(!(efficiency > 0 && efficiency <= 4));
+            int curr, next;
+            int redBit, offset;
+            String tmpMsg;
+            offset = 0;
+            for(i=0;i<vectorQuantizationIndexes.length;i+=efficiency){
+                for(j=0; j<vectorQuantizationIndexes[i].length;j++){
+                    curr = vectorQuantizationIndexes[i][j];
+                    next = refactorizedCodewordMap.get(vectorQuantizationIndexes[i][j]);
+                    if(curr != next){
+                        redBit = bitRedundancyMap.get(next);
+                        
+                        if (offset+redBit > msg.length()){      // podmiana ostatniej wiadomosci
+                            i = vectorQuantizationIndexes.length;
+                            tmpMsg = msg.substring(offset, 133);
+                            
+                        }
+                        else{               // podmiana kazdej innej
+                            tmpMsg = msg.substring(offset, offset+redBit);
+                            offset+=redBit;
+                        }
+                        
+                        vectorQuantizationIndexes[i][j] = next;
+                    }
+                }
             }
             
+            
+            
         }
+        
         
         StringBuilder sb = new StringBuilder();
         for (String s: arrayOfFrames){
             sb.append(s);
         }
         
-        return sb.toString();*/
+        return sb.toString();
     }
     //Auxiliary functions
     
@@ -431,33 +502,13 @@ public class SpeexFileReader implements CodewordEnergy {
         }while(threshold==0);
         //threshold = 15;
         refactorEnergyMap(m, refactorizedCodewordMap,threshold);
-        int chC=0;
+        /*int chC=0;
         for(int w=0; w < refactorizedCodewordMap.size(); w++){
             if (w != refactorizedCodewordMap.get(w)) chC++; 
         }
-        System.out.println("[7] " + codewordEnergyMode4[7]);
-        System.out.println("[90] " + codewordEnergyMode4[90]);
-        System.out.println("[0] " + codewordEnergyMode4[0]);
-        System.out.println("refed Map: \n" + refactorizedCodewordMap);
-        RTP rtpPacket = new RTP();
-        
-        rtpPacket.setCsrc(1);
-        
-        rtpPacket.incrementCsrc();
-        
-        System.out.println("rtpPacket.getPadding() " + rtpPacket.getCsrc());
-        
-        //byte[] arr = rtpPacket.createRtpPacket(rtpPacket);
-        
-        //System.out.println("chC " + (float)chC/(1<<idxSize) * 100 + " %");
+        System.out.println("chC " + (float)chC/(1<<idxSize) * 100 + " %");*/
     }
     
-    /*
-    
-    */
-    public void displayMap(Map<Integer,Double> m){
-        System.out.println("map "+m.values());
-    }
     /*
     Function used for refactorization codeword energy Map. If finds possible redundancy in 0-1 
     codebook index notation. Function rely on provided by user threshold in "%" ( maximum 
@@ -469,7 +520,6 @@ public class SpeexFileReader implements CodewordEnergy {
         String _old, _new;
         int _oldSize, _newSize;
         int redundancy =0;
-        
         for (int i=0; i<m.size(); i++){
             item = m.get(i);
             tmpItem = item * (1.f - (float)(threshold*0.01f));
@@ -509,9 +559,12 @@ public class SpeexFileReader implements CodewordEnergy {
    Main function for testing steganographic method 
    */   
     public static void main(String[] args){
+        
+    USE_LSB_METHOD = 1;
+    USE_CRIS_METHOD = 2;
       
       String basePath = "C:\\Users\\Cz4p3L\\Desktop\\Studia\\Magisterka\\speech_samples\\H57\\"; //base path for speech sample files
-      String basePathLCZ = "C:\\Users\\lukasz.czapla\\Desktop\\mgr\\Magisterka\\speech_samples\\H57\\";
+      //String basePathLCZ = "C:\\Users\\lukasz.czapla\\Desktop\\mgr\\Magisterka\\speech_samples\\H57\\";
       /*String[] sampleArrFile = {"H11mode4.bin", "H12mode4.bin","H13mode4.bin","H14mode4.bin","H15mode4.bin","H16mode4.bin","H17mode4.bin","H18mode4.bin","H19mode4.bin","H110mode4.bin",
                                 "H11mode5.bin","H12mode5.bin","H13mode5.bin","H14mode5.bin","H15mode5.bin","H16mode5.bin","H17mode5.bin","H18mode5.bin","H19mode5.bin","H110mode5.bin",
                                 "H11mode6.bin","H12mode6.bin","H13mode6.bin","H14mode6.bin","H15mode6.bin","H16mode6.bin","H17mode6.bin","H18mode6.bin","H19mode6.bin","H110mode6.bin"};*/
@@ -526,7 +579,7 @@ public class SpeexFileReader implements CodewordEnergy {
       String dataToHide = "tajna wiadomosc do przekazania przy pomoxy Speex";
       String bitStringToHide = sfr.convertToBitString(dataToHide);
       
-      File inputFile = new File(basePathLCZ + file); // placing input file
+      File inputFile = new File(basePath + file); // placing input file
       String inputFileString = sfr.readFile(inputFile);// string 
       sfr.checkMode(inputFileString);
       String strAfterInsert = sfr.insertMessage(inputFileString, bitStringToHide, sfr.mode);
