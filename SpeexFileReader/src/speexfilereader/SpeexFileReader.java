@@ -107,9 +107,9 @@ public class SpeexFileReader implements CodewordEnergy {
         outputByteFile = new byte[str.length()/8];
         while(!endOfStr){
             tmpByte = Integer.parseInt(str.substring(j, j+8), 2);
-            System.out.println("tmpbyte " + tmpByte);
+            //System.out.println("tmpbyte " + tmpByte);
             outputByteFile[i] = (byte)tmpByte;
-            System.out.println("byte b:" + outputByteFile[i]);
+            //System.out.println("byte b:" + outputByteFile[i]);
             i+=1;
             j+=8;
             if (j >= str.length()){
@@ -349,33 +349,77 @@ public class SpeexFileReader implements CodewordEnergy {
             }
             while(!(efficiency > 0 && efficiency <= 4));
             int curr, next;
-            int redBit, offset;
-            String tmpMsg;
+            int redBits, offset;
+            int intValTmpMsg, exchIdx;
+            int lastUsedFrame;
+            
+            lastUsedFrame = 0;
+            String tmpMsg;           
             offset = 0;
+            //System.out.println("bit redundancy map \n" + bitRedundancyMap);
+            //System.out.println("idx substitution map \n" + refactorizedCodewordMap);
+            /*
+                Index substitution with hidden information
+            */
             for(i=0;i<vectorQuantizationIndexes.length;i+=efficiency){
                 for(j=0; j<vectorQuantizationIndexes[i].length;j++){
                     curr = vectorQuantizationIndexes[i][j];
-                    next = refactorizedCodewordMap.get(vectorQuantizationIndexes[i][j]);
+                    next = refactorizedCodewordMap.get(curr);
+                    //System.out.println("curr " + curr);
+                    //System.out.println("next " + next);
                     if(curr != next){
-                        redBit = bitRedundancyMap.get(next);
-                        
-                        if (offset+redBit > msg.length()){      // podmiana ostatniej wiadomosci
-                            i = vectorQuantizationIndexes.length;
-                            tmpMsg = msg.substring(offset, 133);
-                            
+                        redBits = bitRedundancyMap.get(curr);
+                        if (redBits > 0){
+                            if (offset + redBits >= msg.length()) {
+                                endOfMsg = true;
+                                tmpMsg = msg.substring(offset, msg.length());
+                                intValTmpMsg = Integer.parseInt(tmpMsg, 2) << (idxSize - tmpMsg.length());
+                                exchIdx = next + intValTmpMsg;
+                            } else {               // podmiana kazdej innej
+                                tmpMsg = msg.substring(offset, offset + redBits);
+                                intValTmpMsg = Integer.parseInt(tmpMsg, 2) << (idxSize - tmpMsg.length());
+                                //System.out.println("tmpMsg str: " + tmpMsg);
+                                //System.out.println("tmpMsg int: " + intValTmpMsg);
+                                exchIdx = next + intValTmpMsg;
+                                offset += redBits;
+                            }
+                            if (endOfMsg) {
+                                lastUsedFrame = i;
+                                //System.out.println("last used frame, idx value: " + exchIdx);
+                                vectorQuantizationIndexes[i][j] = exchIdx;
+                                break;
+                            }
+                            //System.out.println("normal frame " + exchIdx);
+                            vectorQuantizationIndexes[i][j] = exchIdx;
                         }
-                        else{               // podmiana kazdej innej
-                            tmpMsg = msg.substring(offset, offset+redBit);
-                            offset+=redBit;
-                        }
-                        
-                        vectorQuantizationIndexes[i][j] = next;
                     }
                 }
+                if (endOfMsg) break;
+            }          
+            /*
+                Replacing indexes in VQ parameter
+            */
+            String strIdx, str2sub = "";
+            int str2subCounter = 0;
+            
+            offset = 0;
+            for (i=0; i < arrayOfFrames.length; i+=efficiency){
+                if (i==lastUsedFrame) break;
+                StringBuffer sb = new StringBuffer(arrayOfFrames[i]);
+                for (int idx: vectorQuantizationIndexes[i]){
+                    strIdx = String.format("%" + idxSize + "s", Integer.toBinaryString(idx)).replace(" ", "0");
+                    str2sub+=strIdx;
+                    str2subCounter++;
+                    if (str2subCounter == idxAmnt){ // changing VQ inside subframe
+                        sb.replace(vqStart+offset, vqStart+vqSize+offset, str2sub);
+                        offset+=sfT;
+                        str2subCounter = 0;
+                        str2sub = "";
+                    }
+                }
+                arrayOfFrames[i] = sb.toString();
+                offset = 0;
             }
-            
-            
-            
         }
         
         
@@ -388,7 +432,7 @@ public class SpeexFileReader implements CodewordEnergy {
     }
     //Auxiliary functions
     
-    public byte[] createRtpPacket(RTP rtp){
+    public byte[] createRtpPacket(RTP rtp, String payload){
         return null;
     }
     
@@ -564,7 +608,7 @@ public class SpeexFileReader implements CodewordEnergy {
     USE_CRIS_METHOD = 2;
       
       String basePath = "C:\\Users\\Cz4p3L\\Desktop\\Studia\\Magisterka\\speech_samples\\H57\\"; //base path for speech sample files
-      //String basePathLCZ = "C:\\Users\\lukasz.czapla\\Desktop\\mgr\\Magisterka\\speech_samples\\H57\\";
+      String basePathLCZ = "C:\\Users\\lukasz.czapla\\Desktop\\mgr\\Magisterka\\speech_samples\\H57\\";
       /*String[] sampleArrFile = {"H11mode4.bin", "H12mode4.bin","H13mode4.bin","H14mode4.bin","H15mode4.bin","H16mode4.bin","H17mode4.bin","H18mode4.bin","H19mode4.bin","H110mode4.bin",
                                 "H11mode5.bin","H12mode5.bin","H13mode5.bin","H14mode5.bin","H15mode5.bin","H16mode5.bin","H17mode5.bin","H18mode5.bin","H19mode5.bin","H110mode5.bin",
                                 "H11mode6.bin","H12mode6.bin","H13mode6.bin","H14mode6.bin","H15mode6.bin","H16mode6.bin","H17mode6.bin","H18mode6.bin","H19mode6.bin","H110mode6.bin"};*/
@@ -579,15 +623,15 @@ public class SpeexFileReader implements CodewordEnergy {
       String dataToHide = "tajna wiadomosc do przekazania przy pomoxy Speex";
       String bitStringToHide = sfr.convertToBitString(dataToHide);
       
-      File inputFile = new File(basePath + file); // placing input file
+      File inputFile = new File(basePathLCZ + file); // placing input file
       String inputFileString = sfr.readFile(inputFile);// string 
       sfr.checkMode(inputFileString);
       String strAfterInsert = sfr.insertMessage(inputFileString, bitStringToHide, sfr.mode);
-      
+      sfr.writeFile(strAfterInsert);
       }      
       //System.out.println("\n" + inputFileString+ "\n");
       
-      //sfr.writeFile(strAfterInsert);
+      
       //System.out.println(strAfterInsert.length());
     //}
 

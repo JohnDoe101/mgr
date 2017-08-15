@@ -24,7 +24,7 @@ public class RTP {
     private String timeStamp;
     private int ssrc;
     private int[] csrcList;
-    private String payload;
+    private String payload;         // payload will be set outside of constructor
     //public static class RTPBuilder(){}
     public RTP(){}
     
