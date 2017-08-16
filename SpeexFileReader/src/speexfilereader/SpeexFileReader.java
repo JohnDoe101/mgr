@@ -420,28 +420,29 @@ public class SpeexFileReader implements CodewordEnergy {
                 offset = 0;
             }
             
-            RTP rtp = new RTP();
-            
-            //rtp.setCsrc(2);
-            
-            System.out.println("field size : " + rtp);
             /*
                 Creating RTP packet
             */
+            int payloadType=20;
+            int csrcSize=1;
+            int[] csrc = {1};
+            arrayOfRtp = new String[arrayOfFrames.length];    
             boolean isPadding=false;
             int paddingSize = 0;
-            /*for (i=0; i<arrayOfFrames.length;i++){
+            for (i=0; i<arrayOfFrames.length;i++){
                 paddingSize = arrayOfFrames[i].length()%32;
                 if (paddingSize != 0){
                     isPadding = true;                   
                 }
                 if (i%efficiency != 0 || i > lastUsedFrame){
-                    arrayOfRtp[i] = createRtpPacket(false, isPadding, paddingSize, arrayOfFrames[i]);     // tutaj mark = 0, no frame affected
+                    arrayOfRtp[i] = createRtpPacket(2, isPadding, false, csrcSize, false, payloadType, i, 0, csrc, arrayOfFrames[i], paddingSize);     // tutaj mark = 0, no frame affected
+                    //System.out.println("iiii " + arrayOfRtp[i]);
                 }
                 else{
-                    arrayOfRtp[i] = createRtpPacket(true, isPadding, paddingSize, arrayOfFrames[i]);     // mark = 1, frame affected
+                    arrayOfRtp[i] = createRtpPacket(2, isPadding, false, csrcSize, true, payloadType, i, 0, csrc, arrayOfFrames[i], paddingSize);     // mark = 1, frame affected
+                    //System.out.println("iiii " + arrayOfRtp[i]);
                 }
-            }*/
+            }
         }
         
         
@@ -461,20 +462,9 @@ public class SpeexFileReader implements CodewordEnergy {
         return sb.toString();
     }
     //Auxiliary functions
-    
-    public String createRtpPacket(boolean mark, boolean isPad,int padSize, String payload){
-        RTP rtp = new RTP();
-        setStaticFields(rtp, mark, isPad);
-        return "";
-    }
-    
-    public void setStaticFields(RTP rtp, boolean mark,boolean pad){
-        rtp.setVersion(2);
-        rtp.setExtension(0);
-        rtp.setCsrc(1);
-        if (pad) rtp.setPadding(1); else rtp.setPadding(0);
-        if (mark) rtp.setMarker(1); else rtp.setMarker(0);
-        
+    public String createRtpPacket(int version, boolean isPad, boolean isExt,int csrc, boolean marker, int payloadType, int sn, int ssrc, int[] csrcList, String payload, int padSize){
+        RTP rtp = new RTP(version, isPad, isExt, csrc, marker, payloadType, sn, ssrc, csrcList, payload, padSize);
+        return rtp.getAllRtpFields();
     }
     
     public String[] divideIntoFrames (String str, int mode){
@@ -664,12 +654,13 @@ public class SpeexFileReader implements CodewordEnergy {
         String dataToHide = "tajna wiadomosc do przekazania przy pomoxy Speex";
         String bitStringToHide = sfr.convertToBitString(dataToHide);
       
-        File inputFile = new File(basePathLCZ + file); // placing input file
+        File inputFile = new File(basePath + file); // placing input file
         String inputFileString = sfr.readFile(inputFile);// string 
         sfr.checkMode(inputFileString);
         String strAfterInsert = sfr.insertMessage(inputFileString, bitStringToHide, sfr.mode);
         
-        sfr.writeFile(strAfterInsert);
+        //if (usedMethod == USE_LSB_METHOD) sfr.writeFile(strAfterInsert);
+        System.out.println("Thank you for watching");
     }      
       //System.out.println("\n" + inputFileString+ "\n");
       
