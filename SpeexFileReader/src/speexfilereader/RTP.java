@@ -14,7 +14,22 @@ package speexfilereader;
  */
 public class RTP {
     
-    private static int version = 2; // version of RTP Protocol
+    private static int VERSION_FIELD_SIZE = 2;
+    private static int ISPADDING_FIELD_SIZE = 1;
+    private static int EXTENSION_FIELD_SIZE = 1;
+    private static int CSRC_FIELD_SIZE = 4;
+    private static int MARKER_FIELD_SIZE = 1;
+    private static int PT_FIELD_SIZE = 7;
+    private static int SN_FIELD_SIZE = 16;
+    private static int TIMESTAMP_FIELD_SIZE = 32;
+    private static int SSRC_FIELD_SIZE = 32;
+    
+    private int CSRCLIST_FIELD_SIZE=32;
+    private int PAYLOAD_FIELD_SIZE;
+    private int PADDING_FIELD_SIZE;
+    
+    
+    private int version;            // version of RTP Protocol
     private int padding;            // 1 - padding used, 0 - no padding; 
     private int extension;          // 1 - extension header used, 0 - no extension header used
     private int csrc;               // number of CSRC count followed by fixed header
@@ -121,7 +136,7 @@ public class RTP {
         return this.csrcList;
     }
     
-    public int[] getCsrcList(){
+    public int[] getCsrcList() throws NullPointerException{
         return this.csrcList;
     }
     
@@ -129,5 +144,9 @@ public class RTP {
         this.payload = payload;
         return this.payload;
     }    
+    
+    public int setCsrcListFieldSize() throws NullPointerException{        
+        return CSRCLIST_FIELD_SIZE*=getCsrc();
+    }
     
 }

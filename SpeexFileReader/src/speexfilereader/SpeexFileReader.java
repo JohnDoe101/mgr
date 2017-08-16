@@ -12,9 +12,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.InputMismatchException;
 import java.util.Map;
-//import java.util.HashMap;
 import java.util.Scanner;
-//import org.jfree.chart.*;
 
 /* Author: Łukasz Czapla */
 class CustomException extends Exception {
@@ -55,6 +53,8 @@ public class SpeexFileReader implements CodewordEnergy {
     StringBuilder binFile = new StringBuilder();   //array of strings to write to
     int mode;
     int efficiency;
+    int usedMethod;
+    
     
     static int USE_LSB_METHOD, USE_CRIS_METHOD;
         
@@ -164,7 +164,6 @@ public class SpeexFileReader implements CodewordEnergy {
                 divisor = 304;
                 initIndexVQ = 104;
                 frameT = divisor;
-                //initEnergyMap(codewordEnergyMode5, codewordEnergyMapMode5);
                 break;
             case 6:
                 vqSize = 64;
@@ -175,7 +174,6 @@ public class SpeexFileReader implements CodewordEnergy {
                 divisor = 368;
                 initIndexVQ = 120;
                 frameT = divisor;
-                //SinitEnergyMap(codewordEnergyMode6, codewordEnergyMapMode6);
                 break;
             default: 
                 System.out.println("Unsupported Speex mode!!");
@@ -223,6 +221,7 @@ public class SpeexFileReader implements CodewordEnergy {
     */
     private String insertMessage(String str, String msg, int m){
         String[] arrayOfFrames = null;
+        String[] arrayOfRtp = null;
         boolean endOfFile=false;
         boolean endOfMsg=false;
         boolean endOfFrame;
@@ -230,7 +229,7 @@ public class SpeexFileReader implements CodewordEnergy {
         int j = 0;
         int numOfLSB = 0;
         int n = 1; //number of frame
-        int usedMethod=0;
+        usedMethod=0;
         
         System.out.println("Which method would you like to use? ( LSB:1 / CRIS:2 )");
         do {
@@ -420,20 +419,62 @@ public class SpeexFileReader implements CodewordEnergy {
                 arrayOfFrames[i] = sb.toString();
                 offset = 0;
             }
+            
+            RTP rtp = new RTP();
+            
+            //rtp.setCsrc(2);
+            
+            System.out.println("field size : " + rtp);
+            /*
+                Creating RTP packet
+            */
+            boolean isPadding=false;
+            int paddingSize = 0;
+            /*for (i=0; i<arrayOfFrames.length;i++){
+                paddingSize = arrayOfFrames[i].length()%32;
+                if (paddingSize != 0){
+                    isPadding = true;                   
+                }
+                if (i%efficiency != 0 || i > lastUsedFrame){
+                    arrayOfRtp[i] = createRtpPacket(false, isPadding, paddingSize, arrayOfFrames[i]);     // tutaj mark = 0, no frame affected
+                }
+                else{
+                    arrayOfRtp[i] = createRtpPacket(true, isPadding, paddingSize, arrayOfFrames[i]);     // mark = 1, frame affected
+                }
+            }*/
         }
         
         
         StringBuilder sb = new StringBuilder();
-        for (String s: arrayOfFrames){
-            sb.append(s);
+        if (usedMethod == USE_LSB_METHOD){
+            for (String s : arrayOfFrames) {
+                sb.append(s);
+            }
         }
+        else{
+            for (String s : arrayOfRtp) {
+                sb.append(s);
+            }
+        }
+        
         
         return sb.toString();
     }
     //Auxiliary functions
     
-    public byte[] createRtpPacket(RTP rtp, String payload){
-        return null;
+    public String createRtpPacket(boolean mark, boolean isPad,int padSize, String payload){
+        RTP rtp = new RTP();
+        setStaticFields(rtp, mark, isPad);
+        return "";
+    }
+    
+    public void setStaticFields(RTP rtp, boolean mark,boolean pad){
+        rtp.setVersion(2);
+        rtp.setExtension(0);
+        rtp.setCsrc(1);
+        if (pad) rtp.setPadding(1); else rtp.setPadding(0);
+        if (mark) rtp.setMarker(1); else rtp.setMarker(0);
+        
     }
     
     public String[] divideIntoFrames (String str, int mode){
@@ -604,31 +645,32 @@ public class SpeexFileReader implements CodewordEnergy {
    */   
     public static void main(String[] args){
         
-    USE_LSB_METHOD = 1;
-    USE_CRIS_METHOD = 2;
+        USE_LSB_METHOD = 1;
+        USE_CRIS_METHOD = 2;
       
-      String basePath = "C:\\Users\\Cz4p3L\\Desktop\\Studia\\Magisterka\\speech_samples\\H57\\"; //base path for speech sample files
-      String basePathLCZ = "C:\\Users\\lukasz.czapla\\Desktop\\mgr\\Magisterka\\speech_samples\\H57\\";
-      /*String[] sampleArrFile = {"H11mode4.bin", "H12mode4.bin","H13mode4.bin","H14mode4.bin","H15mode4.bin","H16mode4.bin","H17mode4.bin","H18mode4.bin","H19mode4.bin","H110mode4.bin",
+        String basePath = "C:\\Users\\Cz4p3L\\Desktop\\Studia\\Magisterka\\speech_samples\\H57\\"; //base path for speech sample files
+        String basePathLCZ = "C:\\Users\\lukasz.czapla\\Desktop\\mgr\\Magisterka\\speech_samples\\H57\\";
+        /*String[] sampleArrFile = {"H11mode4.bin", "H12mode4.bin","H13mode4.bin","H14mode4.bin","H15mode4.bin","H16mode4.bin","H17mode4.bin","H18mode4.bin","H19mode4.bin","H110mode4.bin",
                                 "H11mode5.bin","H12mode5.bin","H13mode5.bin","H14mode5.bin","H15mode5.bin","H16mode5.bin","H17mode5.bin","H18mode5.bin","H19mode5.bin","H110mode5.bin",
                                 "H11mode6.bin","H12mode6.bin","H13mode6.bin","H14mode6.bin","H15mode6.bin","H16mode6.bin","H17mode6.bin","H18mode6.bin","H19mode6.bin","H110mode6.bin"};*/
-      String[] sampleArrFile = {"H571mode4.bin", "H572mode4.bin","H573mode4.bin","H574mode4.bin","H575mode4.bin","H576mode4.bin","H577mode4.bin","H578mode4.bin","H579mode4.bin","H5710mode4.bin",
+        String[] sampleArrFile = {"H571mode4.bin", "H572mode4.bin","H573mode4.bin","H574mode4.bin","H575mode4.bin","H576mode4.bin","H577mode4.bin","H578mode4.bin","H579mode4.bin","H5710mode4.bin",
                                 "H571mode5.bin","H572mode5.bin","H573mode5.bin","H574mode5.bin","H575mode5.bin","H576mode5.bin","H577mode5.bin","H578mode5.bin","H579mode5.bin","H5710mode5.bin",
                                 "H571mode6.bin","H572mode6.bin","H573mode6.bin","H574mode6.bin","H575mode6.bin","H576mode6.bin","H577mode6.bin","H578mode6.bin","H579mode6.bin","H5710mode6.bin"};
-      String file  = "H571mode4.bin";
-      //for (String str: sampleArrFile){
-      //    refactorizedCodewordMap.clear();
-      System.out.println("Sample fileName: " + file); 
-      SpeexFileReader sfr = new SpeexFileReader();
-      String dataToHide = "tajna wiadomosc do przekazania przy pomoxy Speex";
-      String bitStringToHide = sfr.convertToBitString(dataToHide);
+        String file  = "H571mode4.bin";
+        //for (String str: sampleArrFile){
+        //    refactorizedCodewordMap.clear();
+        System.out.println("Sample fileName: " + file); 
+        SpeexFileReader sfr = new SpeexFileReader();
+        String dataToHide = "tajna wiadomosc do przekazania przy pomoxy Speex";
+        String bitStringToHide = sfr.convertToBitString(dataToHide);
       
-      File inputFile = new File(basePathLCZ + file); // placing input file
-      String inputFileString = sfr.readFile(inputFile);// string 
-      sfr.checkMode(inputFileString);
-      String strAfterInsert = sfr.insertMessage(inputFileString, bitStringToHide, sfr.mode);
-      sfr.writeFile(strAfterInsert);
-      }      
+        File inputFile = new File(basePathLCZ + file); // placing input file
+        String inputFileString = sfr.readFile(inputFile);// string 
+        sfr.checkMode(inputFileString);
+        String strAfterInsert = sfr.insertMessage(inputFileString, bitStringToHide, sfr.mode);
+        
+        sfr.writeFile(strAfterInsert);
+    }      
       //System.out.println("\n" + inputFileString+ "\n");
       
       
