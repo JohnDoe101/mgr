@@ -64,17 +64,17 @@ public class RTP {
     }
     
     public final String getAllRtpFields(){
-        return getVersion() 
+        return getVersion()   
              + getIsPadding() 
-             + getExtension() 
-             + getSsrc() 
-             + getMarker() 
-             + getPayloadType() 
-             + getSequenceNumber() 
-             + getTimestamp() 
-             + getSsrc() 
+             + getExtension()
+             + getCsrc()
+             + getMarker()
+             + getPayloadType()
+             + getSequenceNumber()
+             + getTimestamp()
+             + getSsrc()
              + getCsrcList()
-             + getPayload() 
+             + getPayload()
              + getPadding();
     }
     

@@ -436,11 +436,9 @@ public class SpeexFileReader implements CodewordEnergy {
                 }
                 if (i%efficiency != 0 || i > lastUsedFrame){
                     arrayOfRtp[i] = createRtpPacket(2, isPadding, false, csrcSize, false, payloadType, i, 0, csrc, arrayOfFrames[i], paddingSize);     // tutaj mark = 0, no frame affected
-                    //System.out.println("iiii " + arrayOfRtp[i]);
                 }
                 else{
-                    arrayOfRtp[i] = createRtpPacket(2, isPadding, false, csrcSize, true, payloadType, i, 0, csrc, arrayOfFrames[i], paddingSize);     // mark = 1, frame affected
-                    //System.out.println("iiii " + arrayOfRtp[i]);
+                    arrayOfRtp[i] = createRtpPacket(2, isPadding, false, csrcSize, true, payloadType, i, 0, csrc, arrayOfFrames[i], paddingSize);     // mark = 1, frame affected                    
                 }
             }
         }
@@ -467,6 +465,10 @@ public class SpeexFileReader implements CodewordEnergy {
         return rtp.getAllRtpFields();
     }
     
+    public int checkUsedMethod(){
+        if (usedMethod == USE_LSB_METHOD) return 1;
+        else return 2;
+    }
     public String[] divideIntoFrames (String str, int mode){
         
         int amountOfFrames;
@@ -658,14 +660,8 @@ public class SpeexFileReader implements CodewordEnergy {
         String inputFileString = sfr.readFile(inputFile);// string 
         sfr.checkMode(inputFileString);
         String strAfterInsert = sfr.insertMessage(inputFileString, bitStringToHide, sfr.mode);
+        if (sfr.checkUsedMethod() == USE_LSB_METHOD) sfr.writeFile(strAfterInsert);
+        else System.out.println("Thank you for watching");
         
-        //if (usedMethod == USE_LSB_METHOD) sfr.writeFile(strAfterInsert);
-        System.out.println("Thank you for watching");
     }      
-      //System.out.println("\n" + inputFileString+ "\n");
-      
-      
-      //System.out.println(strAfterInsert.length());
-    //}
-
 }
