@@ -18,7 +18,7 @@ public class RTP {
     */
     private static int VERSION_FIELD_SIZE = 2;
     private static int ISPADDING_FIELD_SIZE = 1;
-    private static int EXTENSION_FIELD_SIZE = 1;
+    private static int ISEXTENSION_FIELD_SIZE = 1;
     private static int CSRC_FIELD_SIZE = 4;
     private static int MARKER_FIELD_SIZE = 1;
     private static int PT_FIELD_SIZE = 7;
@@ -47,7 +47,7 @@ public class RTP {
     //public static class RTPBuilder(){}
     public RTP(){}
     
-    public RTP(int v, boolean isPad, boolean isExt, int csrc, boolean marker, int pt, int sn, int ssrc, int[] csrcList, String payload, int padSize) {
+    public RTP(int v, boolean isPad, boolean isExt, int csrc, boolean marker, int pt, int sn,long ts, int ssrc, int[] csrcList, String payload, int padSize) {
         this.version = setVersion(v);           
         this.isPadding = setIsPadding(isPad);
         this.extension = setExtension(isExt);
@@ -56,7 +56,7 @@ public class RTP {
         this.marker = setMarker(marker);
         this.pt = setPayloadType(pt);
         this.sn = setSequenceNumer(sn);
-        this.timeStamp = setTimestamp();        
+        this.timeStamp = setTimestamp(ts);        
         this.ssrc = setSsrc(ssrc);
         this.csrcList = setCsrcList(csrcList);
         this.payload = setPayload(payload);
@@ -77,7 +77,119 @@ public class RTP {
              + getPayload()
              + getPadding();
     }
-    
+    //RTP(int v, boolean isPad, boolean isExt, int csrc, boolean marker, int pt, int sn, int ssrc, int[] csrcList, String payload, int padSize)
+
+    /**
+     *
+     * @param str: String RTP frame 
+     * @return RTP as Object
+     */
+    public static RTP parseRTP(String str){
+        int offset;
+        String tmpField;
+        int v, cSrc, pT, sN, sSrc, pSize;
+        boolean isPad, isExt, mark;
+        long ts;
+        String audioData;
+        int[] cSrcList;
+        
+        offset = 0;
+        
+        tmpField = str.substring(offset, offset + VERSION_FIELD_SIZE);
+        
+        if (Integer.parseInt(tmpField,2) != 2){
+            v = 0;
+            System.err.println("Unrecognized RTP Version!");
+        }
+        else{
+            v = 2;
+            offset+=VERSION_FIELD_SIZE;
+        }
+        
+        tmpField = str.substring(offset, offset + ISPADDING_FIELD_SIZE);
+        
+        if (tmpField.equals("0")){
+            isPad = false;
+            offset+=ISPADDING_FIELD_SIZE;
+        }
+        else{
+            isPad = true;
+            offset+=ISPADDING_FIELD_SIZE;
+        }
+        
+        tmpField = str.substring(offset, offset + ISEXTENSION_FIELD_SIZE);
+        
+        if (tmpField.equals("0")){
+            isExt = false;
+            offset+=ISEXTENSION_FIELD_SIZE;
+        }
+        else{
+            isExt = true;
+            offset+=ISEXTENSION_FIELD_SIZE;
+        }
+        
+        tmpField = str.substring(offset, offset + CSRC_FIELD_SIZE);
+        cSrc = Integer.parseInt(tmpField,2);
+        offset+=CSRC_FIELD_SIZE;
+        
+        tmpField = str.substring(offset, offset + MARKER_FIELD_SIZE);
+        
+        if (tmpField.equals("0")){
+            mark = false;
+            offset+=MARKER_FIELD_SIZE;
+        }
+        else{
+            mark = true;
+            offset+=MARKER_FIELD_SIZE;
+        }
+        
+        tmpField = str.substring(offset, offset + PT_FIELD_SIZE);
+        pT = Integer.parseInt(tmpField,2);
+        offset+=PT_FIELD_SIZE;
+        
+        tmpField = str.substring(offset, offset + SN_FIELD_SIZE);
+        sN = Integer.parseInt(tmpField,2);
+        offset+=SN_FIELD_SIZE;
+        
+        tmpField = str.substring(offset, offset + TIMESTAMP_FIELD_SIZE);
+        ts = Long.parseLong(tmpField, 2);
+        offset+=TIMESTAMP_FIELD_SIZE;
+        
+        tmpField = str.substring(offset, offset + SSRC_FIELD_SIZE);
+        sSrc = Integer.parseInt(tmpField,2);
+        offset+=SSRC_FIELD_SIZE;
+        
+        cSrcList = new int[cSrc];
+        for(int i=0; i < cSrc ; i++){
+            tmpField = str.substring(offset, offset + BASIC_CSRCLIST_FIELD_SIZE);
+            cSrcList[i] = Integer.parseInt(tmpField,2);
+            offset+=BASIC_CSRCLIST_FIELD_SIZE;
+        }
+        
+        if (isPad){
+            int eopl=0;
+            for (int i = str.length()-1;; i--) {
+                if ('1' == str.charAt(i)){
+                    tmpField+='1';
+                }
+                else{
+                    tmpField='0'+tmpField;
+                    eopl =i;
+                    
+                    audioData = str.substring(offset, eopl);
+                    pSize = tmpField.length();
+                    break;
+                }
+            }
+        }
+        else{
+            audioData = str.substring(offset, str.length());
+            pSize = 0;
+        }
+        
+        
+        return new RTP(v, isPad, isExt, cSrc,mark, pT, sN, ts, sSrc, cSrcList, audioData, pSize);
+    }
     public final String setVersion(int v){
         return this.version=String.format("%" + VERSION_FIELD_SIZE + "s", Integer.toBinaryString(v)).replace(" ", "0");
     }
@@ -95,8 +207,8 @@ public class RTP {
     }
     
     public final String setExtension(boolean ext){
-        if (ext) return this.extension=String.format("%" + EXTENSION_FIELD_SIZE + "s", Integer.toBinaryString(1));
-        else return this.extension=String.format("%" + EXTENSION_FIELD_SIZE + "s", Integer.toBinaryString(0));
+        if (ext) return this.extension=String.format("%" + ISEXTENSION_FIELD_SIZE + "s", Integer.toBinaryString(1));
+        else return this.extension=String.format("%" + ISEXTENSION_FIELD_SIZE + "s", Integer.toBinaryString(0));
     }
     
     public String getExtension(){
@@ -144,8 +256,8 @@ public class RTP {
     }
     
     
-    public final String setTimestamp(){
-        return this.timeStamp=String.format("%" + TIMESTAMP_FIELD_SIZE + "s", Long.toBinaryString(System.currentTimeMillis()/1000)).replace(" ", "0");
+    public final String setTimestamp(long ts){
+        return this.timeStamp=String.format("%" + TIMESTAMP_FIELD_SIZE + "s", Long.toBinaryString(ts/1000)).replace(" ", "0");
     }
     
     public String getTimestamp(){

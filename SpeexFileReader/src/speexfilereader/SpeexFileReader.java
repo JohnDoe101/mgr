@@ -55,7 +55,6 @@ public class SpeexFileReader implements CodewordEnergy {
     int efficiency;
     int usedMethod;
     
-    
     static int USE_LSB_METHOD, USE_CRIS_METHOD;
         
     //reading input Speex stream
@@ -435,10 +434,10 @@ public class SpeexFileReader implements CodewordEnergy {
                     isPadding = true;                   
                 }
                 if (i%efficiency != 0 || i > lastUsedFrame){
-                    arrayOfRtp[i] = createRtpPacket(2, isPadding, false, csrcSize, false, payloadType, i, 0, csrc, arrayOfFrames[i], paddingSize);     // tutaj mark = 0, no frame affected
+                    arrayOfRtp[i] = createRtpPacket(2, isPadding, false, csrcSize, false, payloadType, i, System.currentTimeMillis(),0, csrc, arrayOfFrames[i], paddingSize);     // tutaj mark = 0, no frame affected
                 }
                 else{
-                    arrayOfRtp[i] = createRtpPacket(2, isPadding, false, csrcSize, true, payloadType, i, 0, csrc, arrayOfFrames[i], paddingSize);     // mark = 1, frame affected                    
+                    arrayOfRtp[i] = createRtpPacket(2, isPadding, false, csrcSize, true, payloadType, i, System.currentTimeMillis(), 0, csrc, arrayOfFrames[i], paddingSize);     // mark = 1, frame affected                    
                 }
             }
         }
@@ -460,8 +459,8 @@ public class SpeexFileReader implements CodewordEnergy {
         return sb.toString();
     }
     //Auxiliary functions
-    public String createRtpPacket(int version, boolean isPad, boolean isExt,int csrc, boolean marker, int payloadType, int sn, int ssrc, int[] csrcList, String payload, int padSize){
-        RTP rtp = new RTP(version, isPad, isExt, csrc, marker, payloadType, sn, ssrc, csrcList, payload, padSize);
+    public String createRtpPacket(int version, boolean isPad, boolean isExt,int csrc, boolean marker, int payloadType, int sn, long ts, int ssrc, int[] csrcList, String payload, int padSize){
+        RTP rtp = new RTP(version, isPad, isExt, csrc, marker, payloadType, sn, ts, ssrc, csrcList, payload, padSize);
         return rtp.getAllRtpFields();
     }
     
@@ -661,7 +660,14 @@ public class SpeexFileReader implements CodewordEnergy {
         sfr.checkMode(inputFileString);
         String strAfterInsert = sfr.insertMessage(inputFileString, bitStringToHide, sfr.mode);
         if (sfr.checkUsedMethod() == USE_LSB_METHOD) sfr.writeFile(strAfterInsert);
-        else System.out.println("Thank you for watching");
+        else {
+            String tmp;
+            for (int i=0;i<strAfterInsert.length();i+=352){
+                tmp = strAfterInsert.substring(i, i+352);
+                RTP rtp;
+                rtp = RTP.parseRTP(tmp);
+            }
+        }
         
     }      
 }
