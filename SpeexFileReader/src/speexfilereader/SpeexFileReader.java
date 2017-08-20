@@ -12,6 +12,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.InputMismatchException;
 import java.util.Map;
+import java.util.Random;
 import java.util.Scanner;
 
 /* Author: Łukasz Czapla */
@@ -39,25 +40,29 @@ public class SpeexFileReader implements CodewordEnergy {
     idxSize                     Size of index in bits. Based on used mode
     idxAmnt                     Amount of indexes in VQ parameter per subframe
     divisor                     Variable used for count amount of frames in sample of voice
-    binaryStr                   String with data to hide
+    extractedMessage            String with extracted message after using CRIS#2
     binFile                     Array of strings to write to
     mode                        Calculated Speex mode based on input file
     */
     int [][] vectorQuantizationIndexes;
+    int [][] vqiClone;
     byte[] inputByteFile;    // file to read from
     byte[] outputByteFile;
     int vqSize, vqStart, sfT, frameT, initIndexVQ;
     int idxSize, idxAmnt,idxStart;
     int divisor;
-    String[] binaryStr; // string with data to hide 
+    String extractedMessage; // string with data to hide 
     StringBuilder binFile = new StringBuilder();   //array of strings to write to
     int mode;
     int efficiency;
+    int distance;
     int usedMethod;
     
     static int USE_LSB_METHOD, USE_CRIS_METHOD;
         
-    //reading input Speex stream
+    /*
+        reading input Speex stream
+    */
     public String readFile(File inputFile)
     {   
         FileInputStream fileInputStream;
@@ -90,7 +95,9 @@ public class SpeexFileReader implements CodewordEnergy {
         String finalBinFile = binFile.toString();
         return finalBinFile;
     }
-    //write modified stream into file and convert to original format 
+    /*
+        write modified stream into file and convert to original format 
+    */
     private void writeFile(String str){
         
         String outputPath = "C:\\Users\\Cz4p3L\\Desktop\\";
@@ -354,41 +361,44 @@ public class SpeexFileReader implements CodewordEnergy {
             lastUsedFrame = 0;
             String tmpMsg;           
             offset = 0;
-            //System.out.println("bit redundancy map \n" + bitRedundancyMap);
-            //System.out.println("idx substitution map \n" + refactorizedCodewordMap);
+            vqiClone = vectorQuantizationIndexes.clone();
+            System.out.println("bit redundancy map \n" + bitRedundancyMap);
+            System.out.println("idx substitution map \n" + refactorizedCodewordMap);
             /*
                 Index substitution with hidden information
             */
-            for(i=0;i<vectorQuantizationIndexes.length;i+=efficiency){
-                for(j=0; j<vectorQuantizationIndexes[i].length;j++){
-                    curr = vectorQuantizationIndexes[i][j];
+            for(i=0;i<vqiClone.length;i+=efficiency){
+                for(j=0; j<vqiClone[i].length;j++){
+                    curr = vqiClone[i][j];
                     next = refactorizedCodewordMap.get(curr);
                     //System.out.println("curr " + curr);
                     //System.out.println("next " + next);
                     if(curr != next){
                         redBits = bitRedundancyMap.get(curr);
-                        if (redBits > 0){
-                            if (offset + redBits >= msg.length()) {
+                        //System.out.println("m2h length: " + msg.length());
+                        if (redBits > 0 && redBits <= 4){
+                            if (offset + 1 == msg.length()) {
                                 endOfMsg = true;
+                                //System.out.println("last frame i " + i);
                                 tmpMsg = msg.substring(offset, msg.length());
                                 intValTmpMsg = Integer.parseInt(tmpMsg, 2) << (idxSize - tmpMsg.length());
                                 exchIdx = next + intValTmpMsg;
                             } else {               // podmiana kazdej innej
-                                tmpMsg = msg.substring(offset, offset + redBits);
+                                tmpMsg = msg.substring(offset, offset+1);
                                 intValTmpMsg = Integer.parseInt(tmpMsg, 2) << (idxSize - tmpMsg.length());
                                 //System.out.println("tmpMsg str: " + tmpMsg);
                                 //System.out.println("tmpMsg int: " + intValTmpMsg);
                                 exchIdx = next + intValTmpMsg;
-                                offset += redBits;
+                                offset += 1;
                             }
                             if (endOfMsg) {
                                 lastUsedFrame = i;
-                                //System.out.println("last used frame, idx value: " + exchIdx);
-                                vectorQuantizationIndexes[i][j] = exchIdx;
+                                System.out.println("last used frame, idx value: " + i);
+                                vqiClone[i][j] = exchIdx;
                                 break;
                             }
-                            //System.out.println("normal frame " + exchIdx);
-                            vectorQuantizationIndexes[i][j] = exchIdx;
+                            System.out.println("normal frame " + exchIdx);
+                            vqiClone[i][j] = exchIdx;
                         }
                     }
                 }
@@ -404,7 +414,7 @@ public class SpeexFileReader implements CodewordEnergy {
             for (i=0; i < arrayOfFrames.length; i+=efficiency){
                 if (i==lastUsedFrame) break;
                 StringBuffer sb = new StringBuffer(arrayOfFrames[i]);
-                for (int idx: vectorQuantizationIndexes[i]){
+                for (int idx: vqiClone[i]){
                     strIdx = String.format("%" + idxSize + "s", Integer.toBinaryString(idx)).replace(" ", "0");
                     str2sub+=strIdx;
                     str2subCounter++;
@@ -422,9 +432,16 @@ public class SpeexFileReader implements CodewordEnergy {
             /*
                 Creating RTP packet
             */
-            int payloadType=20;
+            int payloadType;
             int csrcSize=1;
             int[] csrc = {1};
+            int[][] distancePval = {{31,81},{32,82},{33,83},{34,84},{35,85},
+                                    {36,86},{37,87},{38,88},{39,89},{40,90},
+                                    {41,91},{42,92},{43,93},{44,94},{45,95},
+                                    };
+            Random rand = new Random();
+            
+            payloadType = distancePval[distance-1][rand.nextInt(2)];
             arrayOfRtp = new String[arrayOfFrames.length];    
             boolean isPadding=false;
             int paddingSize = 0;
@@ -550,6 +567,7 @@ public class SpeexFileReader implements CodewordEnergy {
                 val <<= 1;
             }
         }       
+        System.out.println("length: " + (binary.toString()).length());
         return binary.toString();
     }
     /*
@@ -575,8 +593,9 @@ public class SpeexFileReader implements CodewordEnergy {
             catch(InputMismatchException e){
                 threshold = 0;              
             }           
-        }while(threshold==0);
+        }while(threshold==0 || threshold>15);
         //threshold = 15;
+        distance = threshold;
         refactorEnergyMap(m, refactorizedCodewordMap,threshold);
         /*int chC=0;
         for(int w=0; w < refactorizedCodewordMap.size(); w++){
@@ -613,12 +632,11 @@ public class SpeexFileReader implements CodewordEnergy {
                     if (next >= tmpItem){ //   if tmpItem=<next<item then replace
                         _newSize = _new.length();
                         if (_oldSize > _newSize){
-                            
+                            _oldSize = String.format("%"+ idxSize + "s", Integer.toBinaryString(i)).replace(" ", "0").length();
                             if (_oldSize - _newSize > redundancy){
                                 redundancy = _oldSize - _newSize;
                                 m2.replace(i, j);
-                            }
-                            
+                            }                           
                         }                       
                     }
                     else{    
@@ -631,6 +649,47 @@ public class SpeexFileReader implements CodewordEnergy {
         }
         
     }
+    
+    /**
+     *
+     * @param str SpeexFrame with hidden data placed
+     * @param usedTh used threshold for calculating substitional indexes
+     * @return Speex frame without hidden data (this will be stored in 
+     */
+    public String extractAudioPayload(String str, int usedTh){
+        extractedMessage="";
+        //getIndexVQ(str, frameT, idxAmnt, idxSize, idxStart);
+        return "";
+    }
+    
+    
+    /*
+    String tmpVQ; //vector quantization indices from subframe
+        boolean eoVQ;//end of frame
+        int j,k,l,m;
+        l=0;
+        j=vqStart;
+        //System.out.println("start: " + frameNo);
+        for(int i=0; i<4;i++){            
+            k=indexAmount;
+            m=indexStart;
+            tmpVQ = frame.substring(j,j+vqSize);
+            //System.out.println("tmpVQ " + tmpVQ + "\n " + i);
+            //System.out.println("length of VQ" + tmpVQ.length() + "\nVQ content " + tmpVQ);
+            do{
+                vectorQuantizationIndexes[frameNo][l++] = Integer.parseInt(tmpVQ.substring(m, m + indexBitSize), 2);        // i-th frame,
+                //System.out.println("vectorQuantizationIndexes[i][l-1]" + vectorQuantizationIndexes[frameNo][l-1]);
+                m+=indexBitSize;
+                k--;
+                eoVQ = k==0;
+            }
+            while(!eoVQ);
+            j += sfT;
+        }
+        //System.out.println("end");
+        j=vqStart;        
+    }
+    */
 /* 
    Main function for testing steganographic method 
    */   
@@ -648,26 +707,48 @@ public class SpeexFileReader implements CodewordEnergy {
                                 "H571mode5.bin","H572mode5.bin","H573mode5.bin","H574mode5.bin","H575mode5.bin","H576mode5.bin","H577mode5.bin","H578mode5.bin","H579mode5.bin","H5710mode5.bin",
                                 "H571mode6.bin","H572mode6.bin","H573mode6.bin","H574mode6.bin","H575mode6.bin","H576mode6.bin","H577mode6.bin","H578mode6.bin","H579mode6.bin","H5710mode6.bin"};
         String file  = "H571mode4.bin";
-        //for (String str: sampleArrFile){
+        String dataToHide = "hidden message to sent";
         //    refactorizedCodewordMap.clear();
-        System.out.println("Sample fileName: " + file); 
+        System.out.println("Sample fileName: " + file);
+        
         SpeexFileReader sfr = new SpeexFileReader();
-        String dataToHide = "tajna wiadomosc do przekazania przy pomoxy Speex";
         String bitStringToHide = sfr.convertToBitString(dataToHide);
       
         File inputFile = new File(basePath + file); // placing input file
         String inputFileString = sfr.readFile(inputFile);// string 
         sfr.checkMode(inputFileString);
         String strAfterInsert = sfr.insertMessage(inputFileString, bitStringToHide, sfr.mode);
+        
         if (sfr.checkUsedMethod() == USE_LSB_METHOD) sfr.writeFile(strAfterInsert);
         else {
+            //System.out.println("using 2nd method");
             String tmp;
+            StringBuilder sb = new StringBuilder();
+            int frame=0;
             for (int i=0;i<strAfterInsert.length();i+=352){
                 tmp = strAfterInsert.substring(i, i+352);
+                int usedTh;
                 RTP rtp;
                 rtp = RTP.parseRTP(tmp);
+                if(rtp.getMarker().equals("1")){
+                    usedTh = Integer.parseInt(rtp.getPayloadType(),2);
+                    if (usedTh >=35 && usedTh <= 45){
+                        //System.out.println("first group");
+                        usedTh-=30;
+                    }
+                    else{
+                        //System.out.println("second grup");
+                        usedTh-=80;
+                    }
+                    //System.out.println("used th " + usedTh);
+                    sb.append(sfr.extractAudioPayload(rtp.getPayload(), usedTh));
+                    break;
+                }
+                else{
+                    sb.append(rtp.getPayload());
+                }              
             }
-        }
-        
+            sfr.writeFile(sb.toString());
+        }   
     }      
 }
