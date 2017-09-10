@@ -10,6 +10,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.InputMismatchException;
 import java.util.Map;
 import java.util.Random;
@@ -46,19 +47,21 @@ public class SpeexFileReader implements CodewordEnergy {
     */
     int [][] vectorQuantizationIndexes;
     int [][] vqiClone;
+    float[] usedCdbk;
     byte[] inputByteFile;    // file to read from
     byte[] outputByteFile;
     int vqSize, vqStart, sfT, frameT, initIndexVQ;
     int idxSize, idxAmnt,idxStart;
     int divisor;
-    String extractedMessage; // string with data to hide 
+    String extractedMessage = ""; // string with data to hide 
     StringBuilder binFile = new StringBuilder();   //array of strings to write to
     int mode;
     int efficiency;
     int distance;
     int usedMethod;
+    int lastUsedFrame;
     
-    static int USE_LSB_METHOD, USE_CRIS_METHOD;
+    static int USE_LSB_METHOD, USE_ECBD_METHOD;
         
     /*
         reading input Speex stream
@@ -101,11 +104,12 @@ public class SpeexFileReader implements CodewordEnergy {
     private void writeFile(String str){
         
         String outputPath = "C:\\Users\\Cz4p3L\\Desktop\\";
+        String outputPathLCZ = "C:\\Users\\lukasz.czapla\\Desktop\\";
         String extension = ".bin";
         Scanner sc = new Scanner(System.in);
         System.out.println("Please insert fileName");
         String outputFileName = sc.nextLine();
-        String fileDest = outputPath + outputFileName + extension;
+        String fileDest = outputPathLCZ + outputFileName + extension;
         boolean endOfStr = false;
         int i=0;
         int j=0;
@@ -160,6 +164,7 @@ public class SpeexFileReader implements CodewordEnergy {
                 divisor = 224;
                 initIndexVQ = 75;
                 frameT = divisor;
+                usedCdbk = codewordEnergyMode4.clone();
                 break;
             case 5:
                 vqSize = 48;
@@ -170,6 +175,7 @@ public class SpeexFileReader implements CodewordEnergy {
                 divisor = 304;
                 initIndexVQ = 104;
                 frameT = divisor;
+                usedCdbk = codewordEnergyMode5.clone();
                 break;
             case 6:
                 vqSize = 64;
@@ -180,19 +186,17 @@ public class SpeexFileReader implements CodewordEnergy {
                 divisor = 368;
                 initIndexVQ = 120;
                 frameT = divisor;
+                usedCdbk = codewordEnergyMode6.clone();
                 break;
             default: 
-                System.out.println("Unsupported Speex mode!!");
-                idxSize = 1;
-                idxAmnt = 1;
-                divisor = 1;
+                System.err.println("Unsupported Speex mode!!");
                 break;
         }
     }
     /*
     Function for sending VQ indices to file, for further processing
     */
-    public void saveIndicesToFile(){
+    /*public void saveIndicesToFile(){
         String basePath = "C:\\Users\\Cz4p3L\\Desktop\\";
         String extension =".csv";
         String fileName;
@@ -202,8 +206,7 @@ public class SpeexFileReader implements CodewordEnergy {
         fileName = sc.nextLine();
         outputFile = basePath + fileName + extension;
         
-        try{
-            FileWriter fw = new FileWriter(outputFile);
+        try(FileWriter fw = new FileWriter(outputFile)) {
             int fr = 0;
             for (int[] vqi : vectorQuantizationIndexes) {
                 for (int j = 0; j < vqi.length; j++) {
@@ -212,12 +215,11 @@ public class SpeexFileReader implements CodewordEnergy {
                     fw.append("\n");
                 }
             }
-            fw.close();
         }
         catch(Exception e){
             System.err.println("Error while saving indices to file");
         }
-    }
+    }*/
     /* Insert hidden message into bitstream
     @params         String str, String msg, int m
     str - original voice sample (converted into 8-bit string representation)
@@ -236,8 +238,9 @@ public class SpeexFileReader implements CodewordEnergy {
         int numOfLSB = 0;
         int n = 1; //number of frame
         usedMethod=0;
+        //System.out.println("msg " + msg);
         
-        System.out.println("Which method would you like to use? ( LSB:1 / CRIS:2 )");
+        System.out.println("Which method would you like to use? ( LSB:1 / CBD:2 )");
         do {
             Scanner scan = new Scanner(System.in);
             try{
@@ -246,7 +249,7 @@ public class SpeexFileReader implements CodewordEnergy {
             catch(InputMismatchException e){
                 System.out.println("Wrong format");
             }
-        }while(usedMethod != USE_CRIS_METHOD && usedMethod != USE_LSB_METHOD);
+        }while(usedMethod != USE_ECBD_METHOD && usedMethod != USE_LSB_METHOD);
             
         
         //System.out.println("T    " + frameT + "\n" + "IVQ  " + initIndexVQ + "\n" + "sfT  " + sfT);
@@ -280,8 +283,6 @@ public class SpeexFileReader implements CodewordEnergy {
 
             }
             arrayOfFrames = divideIntoFrames(str, mode);
-            //checkSubstitutionCapability(vectorQuantizationIndexes, refactorizedCodewordMap);
-            //saveIndicesToFile();
             String tmpMsg;
 
             while (!endOfFile && !endOfMsg) {
@@ -326,24 +327,12 @@ public class SpeexFileReader implements CodewordEnergy {
                 }
             }
         }
-        else if (usedMethod == USE_CRIS_METHOD){
-            switch(mode){
-                case 4:
-                    initEnergyMap(codewordEnergyMode4, codewordEnergyMapMode4);
-                    break;
-                case 5:
-                    initEnergyMap(codewordEnergyMode5, codewordEnergyMapMode5);
-                    break;
-                case 6:
-                    initEnergyMap(codewordEnergyMode6, codewordEnergyMapMode6);
-                    break;
-                default:
-                    break;
-            }
+        else if (usedMethod == USE_ECBD_METHOD){    // ECBD - Equally CodeBook Division
+            
             arrayOfFrames = divideIntoFrames(str, mode);
             Scanner sc1 = new Scanner(System.in);
             efficiency = 0;
-            System.out.println("Provide hiding efficiency:");
+            System.out.println("Provide hiding efficiency:"); 
             do{
                 try{
                     efficiency = sc1.nextInt();
@@ -353,80 +342,45 @@ public class SpeexFileReader implements CodewordEnergy {
                 }
             }
             while(!(efficiency > 0 && efficiency <= 4));
-            int curr, next;
-            int redBits, offset;
-            int intValTmpMsg, exchIdx;
-            int lastUsedFrame;
             
-            lastUsedFrame = 0;
-            String tmpMsg;           
-            offset = 0;
-            vqiClone = vectorQuantizationIndexes.clone();
-            System.out.println("bit redundancy map \n" + bitRedundancyMap);
-            System.out.println("idx substitution map \n" + refactorizedCodewordMap);
-            /*
-                Index substitution with hidden information
-            */
-            for(i=0;i<vqiClone.length;i+=efficiency){
-                for(j=0; j<vqiClone[i].length;j++){
-                    curr = vqiClone[i][j];
-                    next = refactorizedCodewordMap.get(curr);
-                    //System.out.println("curr " + curr);
-                    //System.out.println("next " + next);
-                    if(curr != next){
-                        redBits = bitRedundancyMap.get(curr);
-                        //System.out.println("m2h length: " + msg.length());
-                        if (redBits > 0 && redBits <= 4){
-                            if (offset + 1 == msg.length()) {
-                                endOfMsg = true;
-                                //System.out.println("last frame i " + i);
-                                tmpMsg = msg.substring(offset, msg.length());
-                                intValTmpMsg = Integer.parseInt(tmpMsg, 2) << (idxSize - tmpMsg.length());
-                                exchIdx = next + intValTmpMsg;
-                            } else {               // podmiana kazdej innej
-                                tmpMsg = msg.substring(offset, offset+1);
-                                intValTmpMsg = Integer.parseInt(tmpMsg, 2) << (idxSize - tmpMsg.length());
-                                //System.out.println("tmpMsg str: " + tmpMsg);
-                                //System.out.println("tmpMsg int: " + intValTmpMsg);
-                                exchIdx = next + intValTmpMsg;
-                                offset += 1;
-                            }
-                            if (endOfMsg) {
+            String stegoBit;
+            int buff=0;
+            int bitsInserted=0;
+            System.out.println("msg len :" + msg.length());
+            
+                for (i=0; i< vectorQuantizationIndexes.length; i+=efficiency){
+                    for(j=0; j < vectorQuantizationIndexes[i].length; j++){
+                        if(buff == msg.length()-1){        // insert last message                           
+                            stegoBit = msg.substring(buff, msg.length());
+                            if(insertStegoBit(i, j, vectorQuantizationIndexes[i][j], stegoBit)){
                                 lastUsedFrame = i;
-                                System.out.println("last used frame, idx value: " + i);
-                                vqiClone[i][j] = exchIdx;
-                                break;
+                                bitsInserted++;
+                                endOfMsg = true;
                             }
-                            System.out.println("normal frame " + exchIdx);
-                            vqiClone[i][j] = exchIdx;
+                            else{
+                                continue;
+                            }                            
                         }
+                        else{
+                            stegoBit = msg.substring(buff, buff+1);
+                            if(insertStegoBit(i, j, vectorQuantizationIndexes[i][j], stegoBit)){
+                                bitsInserted++;
+                                buff++;
+                            }
+                            else{
+                                continue;
+                            }
+                        }                    
+                        if (endOfMsg == true || endOfFile == true) break;
                     }
-                }
-                if (endOfMsg) break;
-            }          
+                    if (endOfMsg == true || endOfFile == true) break;
+                } 
             /*
-                Replacing indexes in VQ parameter
+                Insert substitued indices into array of frames
             */
-            String strIdx, str2sub = "";
-            int str2subCounter = 0;
-            
-            offset = 0;
-            for (i=0; i < arrayOfFrames.length; i+=efficiency){
-                if (i==lastUsedFrame) break;
-                StringBuffer sb = new StringBuffer(arrayOfFrames[i]);
-                for (int idx: vqiClone[i]){
-                    strIdx = String.format("%" + idxSize + "s", Integer.toBinaryString(idx)).replace(" ", "0");
-                    str2sub+=strIdx;
-                    str2subCounter++;
-                    if (str2subCounter == idxAmnt){ // changing VQ inside subframe
-                        sb.replace(vqStart+offset, vqStart+vqSize+offset, str2sub);
-                        offset+=sfT;
-                        str2subCounter = 0;
-                        str2sub = "";
-                    }
-                }
-                arrayOfFrames[i] = sb.toString();
-                offset = 0;
+            for (i=0; i < arrayOfFrames.length; i++){
+                if (i > lastUsedFrame) break;               
+                arrayOfFrames[i] = setIndicesInFrame(arrayOfFrames[i], vectorQuantizationIndexes[i]);
             }
             
             /*
@@ -435,13 +389,10 @@ public class SpeexFileReader implements CodewordEnergy {
             int payloadType;
             int csrcSize=1;
             int[] csrc = {1};
-            int[][] distancePval = {{31,81},{32,82},{33,83},{34,84},{35,85},
-                                    {36,86},{37,87},{38,88},{39,89},{40,90},
-                                    {41,91},{42,92},{43,93},{44,94},{45,95},
-                                    };
+            int[] distancePval = {31,32,33};
             Random rand = new Random();
             
-            payloadType = distancePval[distance-1][rand.nextInt(2)];
+            payloadType = distancePval[rand.nextInt(3)];
             arrayOfRtp = new String[arrayOfFrames.length];    
             boolean isPadding=false;
             int paddingSize = 0;
@@ -476,6 +427,87 @@ public class SpeexFileReader implements CodewordEnergy {
         return sb.toString();
     }
     //Auxiliary functions
+    public String setIndicesInFrame(String frame, int[] vqi){
+        
+        StringBuffer bufFrame = new StringBuffer(frame);
+        
+        System.out.println("bufFrame " + bufFrame);
+        String strIdx, str2sub = "";
+        int str2subCounter = 0;
+        int offset=0;
+        
+        for (int idx : vqi) {
+            strIdx = String.format("%" + idxSize + "s", Integer.toBinaryString(idx)).replace(" ", "0");
+            str2sub += strIdx;
+            str2subCounter++;
+            if (str2subCounter == idxAmnt) { // changing VQ inside subframe
+                bufFrame.replace(vqStart + offset, vqStart + vqSize + offset, str2sub);
+                offset += sfT;
+                str2subCounter = 0;
+                str2sub = "";
+            }
+        }      
+        return bufFrame.toString();
+    }  
+    
+    public boolean insertStegoBit(int frame, int vqiPos, int vqiVal, String bit){   //
+        
+        if (vqiVal < edivisiveIndices[0] && bit.equals("0")){   // OK - don't need to exchange anything
+            return true;
+        }
+        else if (vqiVal < edivisiveIndices[2] && vqiVal >= edivisiveIndices[1]  && bit.equals("0")){ // 0 to hide, index points 1
+            vectorQuantizationIndexes[frame][vqiPos] = findVqiSubstitution('0', vqiVal, usedCdbk);
+            return true;
+        }
+        else if (vqiVal < edivisiveIndices[2] && vqiVal >= edivisiveIndices[1] && bit.equals("1")){ // OK - don't need to exchange anything
+            return true;
+        }
+        else if (vqiVal < edivisiveIndices[0] && bit.equals("1")){  // 1 to hide, index points 0
+            vectorQuantizationIndexes[frame][vqiPos] = findVqiSubstitution('1', vqiVal, usedCdbk);
+            return true;
+        }
+        else{
+            System.out.println("skip iteration");
+            return false;
+        }
+    }
+    
+    /**
+     *
+     * @param c bit to hide
+     * @param vqiVal actual value of index
+     * @param uc codebook used for encoding 
+     * @return
+     */
+    public int findVqiSubstitution(char c, int vqiVal, float[] uc){
+        
+        float currEn, distance;
+        int vqSubInd;
+        vqSubInd = 0;
+        distance = Float.MAX_VALUE;
+        
+        if (c == '0'){
+            currEn = uc[vqiVal];
+            for(int i=0; i < edivisiveIndices[0]; i++){
+                if (Math.abs(currEn - uc[i]) < distance){
+                    distance = Math.abs(currEn - uc[i]);
+                    vqSubInd = i;
+                }
+            }
+            return vqSubInd;
+        }
+        else{
+            currEn = uc[vqiVal];
+            for(int i=edivisiveIndices[1]; i < edivisiveIndices[2]; i++){
+                if (Math.abs(currEn - uc[i]) < distance){
+                    distance = Math.abs(currEn - uc[i]);
+                    vqSubInd = i;
+                }
+            }
+            return vqSubInd;
+        }
+    }
+    
     public String createRtpPacket(int version, boolean isPad, boolean isExt,int csrc, boolean marker, int payloadType, int sn, long ts, int ssrc, int[] csrcList, String payload, int padSize){
         RTP rtp = new RTP(version, isPad, isExt, csrc, marker, payloadType, sn, ts, ssrc, csrcList, payload, padSize);
         return rtp.getAllRtpFields();
@@ -484,6 +516,10 @@ public class SpeexFileReader implements CodewordEnergy {
     public int checkUsedMethod(){
         if (usedMethod == USE_LSB_METHOD) return 1;
         else return 2;
+    }
+    
+    public int checkLastUsedFrame(){
+        return lastUsedFrame;
     }
     public String[] divideIntoFrames (String str, int mode){
         
@@ -550,7 +586,9 @@ public class SpeexFileReader implements CodewordEnergy {
         //System.out.println("end");
         j=vqStart;        
     }
-    //Convert hidden message to array of strings, it is simplier to insert into stream
+    /*
+        Convert hidden message to array of strings, it is simplier to insert into stream
+    */
     private String convertToBitString(String str){
         if (str.length() == 0) 
             return "";
@@ -560,6 +598,7 @@ public class SpeexFileReader implements CodewordEnergy {
         
         for (byte b : bytes)
         {
+            
             int val = b;
             for (int i = 0; i < 8; i++)
             {
@@ -567,14 +606,14 @@ public class SpeexFileReader implements CodewordEnergy {
                 val <<= 1;
             }
         }       
-        System.out.println("length: " + (binary.toString()).length());
+        System.out.println("Bit string to hide:\n " + binary.toString());
         return binary.toString();
     }
     /*
     Use of this function is to initialize EnegyMap for specific mode
     Needed for further processing.
     */
-    public void initEnergyMap(float[] cdbk, Map<Integer,Float> m){
+    /*public void initEnergyMap(float[] cdbk, Map<Integer,Float> m){
         int k = 0;
         int threshold = 0;
         for(float v: cdbk){
@@ -596,90 +635,194 @@ public class SpeexFileReader implements CodewordEnergy {
         }while(threshold==0 || threshold>15);
         //threshold = 15;
         distance = threshold;
-        refactorEnergyMap(m, refactorizedCodewordMap,threshold);
+        //refactorEnergyMap(m, refactorizedCodewordMap,threshold);
         /*int chC=0;
         for(int w=0; w < refactorizedCodewordMap.size(); w++){
             if (w != refactorizedCodewordMap.get(w)) chC++; 
         }
-        System.out.println("chC " + (float)chC/(1<<idxSize) * 100 + " %");*/
-    }
+        System.out.println("chC " + (float)chC/(1<<idxSize) * 100 + " %");
+    }*/
     
     /*
     Function used for refactorization codeword energy Map. If finds possible redundancy in 0-1 
     codebook index notation. Function rely on provided by user threshold in "%" ( maximum 
     applicable decrease of original odeword energy and new codeword).
+    @param m - map with original energy levels for appropriate index 
+           m2- map with substituted index
+           threshold - maximum energy decrease for seeked index
     */
-    public void refactorEnergyMap(Map<Integer,Float> m, Map<Integer, Integer> m2, int threshold){
-        float item, next;
-        float tmpItem;
-        String _old, _new;
-        int _oldSize, _newSize;
+    /*public void refactorEnergyMap(Map<Integer,Float> m, Map<Integer, Integer> m2, int threshold){
+        
+        Integer[] alreadyUsedIndices = new Integer[1<<idxSize];
         int redundancy =0;
-        for (int i=0; i<m.size(); i++){
-            item = m.get(i);
-            tmpItem = item * (1.f - (float)(threshold*0.01f));
-            _old = Integer.toBinaryString(i);
-            _oldSize = _old.length();
-            
-            for(int j=0;j<m.size();j++){
-                if (i == j) continue;
-                _new = Integer.toBinaryString(j);                
-                next = m.get(j);
-                if (item <= next){
-                    continue;
-                } 
-                else{                   
-                    if (next >= tmpItem){ //   if tmpItem=<next<item then replace
-                        _newSize = _new.length();
-                        if (_oldSize > _newSize){
-                            _oldSize = String.format("%"+ idxSize + "s", Integer.toBinaryString(i)).replace(" ", "0").length();
-                            if (_oldSize - _newSize > redundancy){
-                                redundancy = _oldSize - _newSize;
-                                m2.replace(i, j);
-                            }                           
-                        }                       
-                    }
-                    else{    
-                        continue;
-                    }
-                }                
+        int nBest=0;
+        Scanner sc = new Scanner(System.in);
+        
+        do{
+            System.out.println("How many n-best indices find?");
+            try{
+                nBest = sc.nextInt();
             }
-            bitRedundancyMap.put(i, redundancy);
-            redundancy = 0;
+            catch(Exception e){
+                System.out.println("Caught exception " + e);
+            }
+        }while(nBest==0 || nBest > 10);
+        
+        Integer[][] foundNBestIndices = new Integer[1<<idxSize][nBest]; // look for up to 5 indexes
+        System.out.println("size of energy map ");
+        for (int i=0; i<m.size(); i++){
+            foundNBestIndices[i] = findNBestIndices(i, m, threshold, nBest);
+        }    
+        
+        
+        
+        System.out.println("array with indices");
+        int k=0;
+        for (Integer[] i: foundNBestIndices){
+            System.out.print(k++ + ":");
+            for(Integer j: i){
+                System.out.print(" " + j);
+            }
+            System.out.println(" ");
+        
         }
         
-    }
+        
+            //bitRedundancyMap.put(i, redundancy);
+            //redundancy = 0;
+        
+        
+    }*/
+    /*
+        Find n-best indices for provided threshold.
+        @param currentIndex
+               m
+               m2
+               threshold
+               nBest
     
+    public Integer[] findNBestIndices(int currentIndex, Map<Integer,Float> m, int threshold, int nBest){
+        float oldEnergy, newEnergy, tmpEnergy;
+        String _oldEnergyBinary, _newEnergyBinary;
+        int _oldEnergyBinaryLength, _newEnergyBinaryLength;
+        int maxVal = Integer.MIN_VALUE;
+        int maxPos=nBest-1;
+        Integer[] nBestIndices = new Integer[nBest];
+        oldEnergy = m.get(currentIndex);
+        tmpEnergy = oldEnergy * (1.f - (float)(threshold*0.01f));
+        _oldEnergyBinary = Integer.toBinaryString(currentIndex);
+        _oldEnergyBinaryLength = _oldEnergyBinary.length();
+        int nullIdx;
+        for(int i=0;i<m.size();i++){
+            newEnergy = m.get(i);
+            _newEnergyBinary = Integer.toBinaryString(i);                
+            _newEnergyBinaryLength = _newEnergyBinary.length();
+            if (tmpEnergy < newEnergy && newEnergy < oldEnergy){  // if index can be used do sth
+                if (_oldEnergyBinaryLength - _newEnergyBinaryLength > 0){
+                    if ((nullIdx = Arrays.asList(nBestIndices).indexOf(null)) != -1) {
+                        nBestIndices[nullIdx] = i;
+                    }
+                    else {
+                        for(int j=0; j<nBestIndices.length;j++){        // looking for biggest value in array, don't care about energy value for index
+                            if (nBestIndices[j] > maxVal){
+                                maxVal = nBestIndices[j];   
+                                maxPos = j;
+                            } 
+                        }
+                        nBestIndices[maxPos] = i;
+                    }               
+                }
+                else if(_oldEnergyBinaryLength == _newEnergyBinaryLength && _oldEnergyBinaryLength != idxSize){   // length difference is equal 0 and size != idxSize
+                    if ((nullIdx = Arrays.asList(nBestIndices).indexOf(null)) != -1) {
+                        nBestIndices[nullIdx] = i;
+                    }
+                    else {
+                        for(int j=0; j<nBestIndices.length;j++){
+                            if (nBestIndices[j] > maxVal){
+                                maxVal = nBestIndices[j];   
+                                maxPos = j;
+                            } 
+                        }
+                        nBestIndices[maxPos] = i;
+                    }
+                }   
+                else{ // if  we cannoot find check in longer indices 
+                    if ((nullIdx = Arrays.asList(nBestIndices).indexOf(null)) != -1) {
+                        nBestIndices[nullIdx] = i;
+                    }
+                    else {
+                        for(int j=0; j<nBestIndices.length;j++){
+                            if (nBestIndices[j] > maxVal){
+                                maxVal = nBestIndices[j];   
+                                maxPos = j;
+                            } 
+                        }
+                        nBestIndices[maxPos] = i;
+                    }
+                }              
+            }       
+        }
+        return nBestIndices;
+    }*/
+    
+    /*
+        show decoded message
+    */
+    public void showMessage(){
+        System.out.println("Decoded message " + extractedMessage);
+        String rm = extractedMessage.substring(0, extractedMessage.length()-extractedMessage.length()%8);
+        int val;
+        String tmp;
+        StringBuilder sb = new StringBuilder();
+        for (int i=0;i<rm.length();i+=8){
+            tmp = rm.substring(i, i+8);
+            val = Integer.parseInt(tmp, 2);
+            sb.append((char)val);
+        }
+        System.out.println("sb " + sb);
+
+        
+        
+    }
     /**
      *
      * @param str SpeexFrame with hidden data placed
-     * @param usedTh used threshold for calculating substitional indexes
+     * @param lastUsedFrame
+     * @param frameNo
      * @return Speex frame without hidden data (this will be stored in 
      */
-    public String extractAudioPayload(String str, int usedTh){
-        extractedMessage="";
-        //getIndexVQ(str, frameT, idxAmnt, idxSize, idxStart);
-        return "";
+    public String extractAudioPayload(String str, int lastUsedFrame, int frameNo){
+        
+        int[][] frame;
+        frame = getIndexesVQfromRTP(str, idxAmnt, idxSize, idxStart);
+        for(int i=0; i<frame[0].length;i++){
+            if (frame[0][i] < edivisiveIndices[0]){
+                extractedMessage += "0";
+            }
+            else if (frame[0][i] >= edivisiveIndices[1] && frame[0][i] < edivisiveIndices[2]){
+                extractedMessage += "1";
+            }
+        }       
+        return str;
     }
     
-    
-    /*
-    String tmpVQ; //vector quantization indices from subframe
+    public int[][] getIndexesVQfromRTP(String str, int idxAmnt, int idxSize, int idxStart){
+        String tmpVQ; //vector quantization indices from subframe
         boolean eoVQ;//end of frame
         int j,k,l,m;
         l=0;
         j=vqStart;
-        //System.out.println("start: " + frameNo);
+        int[][] frame = new int[1][4*idxAmnt];
         for(int i=0; i<4;i++){            
-            k=indexAmount;
-            m=indexStart;
-            tmpVQ = frame.substring(j,j+vqSize);
+            k=idxAmnt;
+            m=idxStart;
+            tmpVQ = str.substring(j,j+vqSize);
             //System.out.println("tmpVQ " + tmpVQ + "\n " + i);
             //System.out.println("length of VQ" + tmpVQ.length() + "\nVQ content " + tmpVQ);
             do{
-                vectorQuantizationIndexes[frameNo][l++] = Integer.parseInt(tmpVQ.substring(m, m + indexBitSize), 2);        // i-th frame,
+                frame[0][l++] = Integer.parseInt(tmpVQ.substring(m, m + idxSize), 2);        // i-th frame,
                 //System.out.println("vectorQuantizationIndexes[i][l-1]" + vectorQuantizationIndexes[frameNo][l-1]);
-                m+=indexBitSize;
+                m+=idxSize;
                 k--;
                 eoVQ = k==0;
             }
@@ -687,16 +830,17 @@ public class SpeexFileReader implements CodewordEnergy {
             j += sfT;
         }
         //System.out.println("end");
-        j=vqStart;        
+        //j=vqStart;
+        return frame;
     }
-    */
+
 /* 
    Main function for testing steganographic method 
    */   
     public static void main(String[] args){
         
         USE_LSB_METHOD = 1;
-        USE_CRIS_METHOD = 2;
+        USE_ECBD_METHOD = 2;
       
         String basePath = "C:\\Users\\Cz4p3L\\Desktop\\Studia\\Magisterka\\speech_samples\\H57\\"; //base path for speech sample files
         String basePathLCZ = "C:\\Users\\lukasz.czapla\\Desktop\\mgr\\Magisterka\\speech_samples\\H57\\";
@@ -707,17 +851,21 @@ public class SpeexFileReader implements CodewordEnergy {
                                 "H571mode5.bin","H572mode5.bin","H573mode5.bin","H574mode5.bin","H575mode5.bin","H576mode5.bin","H577mode5.bin","H578mode5.bin","H579mode5.bin","H5710mode5.bin",
                                 "H571mode6.bin","H572mode6.bin","H573mode6.bin","H574mode6.bin","H575mode6.bin","H576mode6.bin","H577mode6.bin","H578mode6.bin","H579mode6.bin","H5710mode6.bin"};
         String file  = "H571mode4.bin";
-        String dataToHide = "hidden message to sent";
-        //    refactorizedCodewordMap.clear();
+        String dataToHide = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        
         System.out.println("Sample fileName: " + file);
         
         SpeexFileReader sfr = new SpeexFileReader();
         String bitStringToHide = sfr.convertToBitString(dataToHide);
       
-        File inputFile = new File(basePath + file); // placing input file
+        File inputFile = new File(basePathLCZ + file); // placing input file
         String inputFileString = sfr.readFile(inputFile);// string 
         sfr.checkMode(inputFileString);
         String strAfterInsert = sfr.insertMessage(inputFileString, bitStringToHide, sfr.mode);
+        
+        System.out.println("last frame " + sfr.checkLastUsedFrame());
+        
+        int luf = sfr.checkLastUsedFrame();
         
         if (sfr.checkUsedMethod() == USE_LSB_METHOD) sfr.writeFile(strAfterInsert);
         else {
@@ -727,28 +875,20 @@ public class SpeexFileReader implements CodewordEnergy {
             int frame=0;
             for (int i=0;i<strAfterInsert.length();i+=352){
                 tmp = strAfterInsert.substring(i, i+352);
-                int usedTh;
                 RTP rtp;
                 rtp = RTP.parseRTP(tmp);
                 if(rtp.getMarker().equals("1")){
-                    usedTh = Integer.parseInt(rtp.getPayloadType(),2);
-                    if (usedTh >=35 && usedTh <= 45){
-                        //System.out.println("first group");
-                        usedTh-=30;
-                    }
-                    else{
-                        //System.out.println("second grup");
-                        usedTh-=80;
-                    }
                     //System.out.println("used th " + usedTh);
-                    sb.append(sfr.extractAudioPayload(rtp.getPayload(), usedTh));
-                    break;
+                    sb.append(sfr.extractAudioPayload(rtp.getPayload(), luf, frame));
+                    //break;
                 }
                 else{
                     sb.append(rtp.getPayload());
-                }              
+                }  
+                frame++;
             }
+            sfr.showMessage();
             sfr.writeFile(sb.toString());
-        }   
+        }
     }      
 }

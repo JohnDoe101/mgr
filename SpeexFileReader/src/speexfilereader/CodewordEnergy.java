@@ -15,6 +15,8 @@ import java.util.Map;
  */
 public interface CodewordEnergy {
     
+    Integer[] edivisiveIndices = {41,68,111};   // <0;41) , <41;68), <68;111), <111;end> -> 0,?,1,?
+    
     Map<Integer, Float> codewordEnergyMapMode4 = new HashMap<>();
     Map<Integer, Float> codewordEnergyMapMode5 = new HashMap<>();
     Map<Integer, Float> codewordEnergyMapMode6 = new HashMap<>();
@@ -479,5 +481,5 @@ public interface CodewordEnergy {
                                                         1.1992335f
     };
     
-    void initEnergyMap(float[] cbdk, Map<Integer,Float> m);
+    //void initEnergyMap(float[] cbdk, Map<Integer,Float> m);
 }
